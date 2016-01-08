@@ -33,7 +33,10 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
 	// sparse scores
 	accumulator->PlusEquals(this, "sparse-name", 2.4);
-	cur_hypo.GetCurrTargetPhrase();
+
+	TargetPhrase currTargetPhrase = cur_hypo.GetCurrTargetPhrase();
+	AlignmentInfo alignTerm = currTargetPhrase.GetAlignTerm();
+	AlignmentInfo::CollType alignments = alignTerm.GetAlignments();
 	string sourcePhraseStringRep = cur_hypo.GetSourcePhraseStringRep();
 
 	// int targetLen = cur_hypo.GetCurrTargetPhrase().GetSize(); // ??? [UG]
