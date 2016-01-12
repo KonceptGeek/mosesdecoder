@@ -1051,6 +1051,16 @@
 			<locationURI>PARENT-3-PROJECT_LOC/moses/FF/BleuScoreFeature.h</locationURI>
 		</link>
 		<link>
+			<name>FF/CoarseBiLM.cpp</name>
+			<type>1</type>
+			<locationURI>PARENT-3-PROJECT_LOC/moses/FF/CoarseBiLM.cpp</locationURI>
+		</link>
+		<link>
+			<name>FF/CoarseBiLM.h</name>
+			<type>1</type>
+			<locationURI>PARENT-3-PROJECT_LOC/moses/FF/CoarseBiLM.h</locationURI>
+		</link>
+		<link>
 			<name>FF/ConstrainedDecoding.cpp</name>
 			<type>1</type>
 			<locationURI>PARENT-3-PROJECT_LOC/moses/FF/ConstrainedDecoding.cpp</locationURI>

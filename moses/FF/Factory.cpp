@@ -17,6 +17,7 @@
 #include "moses/FF/LexicalReordering/LexicalReordering.h"
 
 #include "moses/FF/BleuScoreFeature.h"
+#include "moses/FF/CoarseBiLM.h"
 #include "moses/FF/TargetWordInsertionFeature.h"
 #include "moses/FF/SourceWordDeletionFeature.h"
 #include "moses/FF/GlobalLexicalModel.h"
@@ -236,6 +237,7 @@ FeatureRegistry::FeatureRegistry()
   MOSES_FNAME(SpanLength);
   MOSES_FNAME(SyntaxRHS);
   MOSES_FNAME(PhraseOrientationFeature);
+  MOSES_FNAME(CoarseBiLM);
 
   MOSES_FNAME(SkeletonStatelessFF);
   MOSES_FNAME(SkeletonStatefulFF);
