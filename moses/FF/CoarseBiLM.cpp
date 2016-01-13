@@ -8,7 +8,6 @@
 #include "moses/Manager.h"
 #include "moses/InputType.h"
 #include "moses/Word.h"
-#include "moses/Sentence.h"
 
 using namespace std;
 
@@ -73,8 +72,8 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 	// sparse scores
 	accumulator->PlusEquals(this, "sparse-name", 2.4);
 
-	vector < string > targetWords;
-	vector < string > sourceWords;
+	vector<string> targetWords;
+	vector<string> sourceWords;
 
 	TargetPhrase currTargetPhrase = cur_hypo.GetCurrTargetPhrase();
 	Manager& manager = cur_hypo.GetManager();
@@ -107,21 +106,27 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 }
 
 void CoarseBiLM::getTargetWords(const Hypothesis& cur_hypo,
-		vector<string> &targetWords) {
+		std::vector<std::string> &targetWords) const {
 	std::size_t targetBegin = cur_hypo.GetCurrTargetWordsRange().GetStartPos();
 	std::size_t targetEnd = cur_hypo.GetCurrTargetWordsRange().GetEndPos();
-	
+
 	int currentTargetPhraseSize = cur_hypo.GetCurrTargetPhrase().GetSize();
 	int previousWordsNeeded = nGramOrder - currentTargetPhraseSize;
-	vector<string> previousWords;
-	
-	//Get previous target words
-	getPreviousTargetWords(cur_hypo, previousWordsNeeded, previousWords);
-	
-	for (int i = previousWordsNeeded - 1; i >= 0; i--) {
-		targetWords.push_back(previousWords[i]);
+
+	if (previousWordsNeeded > 0) {
+		vector<string> previousWords(previousWordsNeeded);
+		//Get previous target words
+		getPreviousTargetWords(cur_hypo, previousWordsNeeded, previousWords);
+
+		for (int i = previousWords.size() - 1; i >= 0; i--) {
+			string previousWord = previousWords[i];
+			boost::algorithm::trim(previousWord);
+			if(!previousWord.empty()) {
+				targetWords.push_back(previousWords[i]);
+			}
+		}
 	}
-	
+
 	if (targetBegin != targetEnd) {
 		for (int index = targetBegin; index <= targetEnd; index++) {
 			targetWords.push_back(cur_hypo.GetWord(index).ToString());
@@ -132,16 +137,18 @@ void CoarseBiLM::getTargetWords(const Hypothesis& cur_hypo,
 
 }
 
-void getPreviousTargetWords(const Hypothesis& cur_hypo, int previousWordsNeeded, vector<string> &targetWords) {
+void CoarseBiLM::getPreviousTargetWords(const Hypothesis& cur_hypo,
+		int previousWordsNeeded, std::vector<std::string> &targetWords) const {
 	const Hypothesis * prevHypo = cur_hypo.GetPrevHypo();
 	int found = 0;
-	
-	while(prevHypo && found != previousWordsNeeded) {
+
+	while (prevHypo && found != previousWordsNeeded) {
 		const TargetPhrase& currTargetPhrase = prevHypo->GetCurrTargetPhrase();
-		for (int i = currTargetPhrase.GetSize() - 1; i> -1; i--) {
-			if (found != previouWordsNeeded) {
+		for (int i = currTargetPhrase.GetSize() - 1; i > -1; i--) {
+			if (found != previousWordsNeeded) {
 				const Word& word = currTargetPhrase.GetWord(i);
-				targetWords.push_front(word.ToString());
+				targetWords[found] = word.ToString();
+				found++;
 			} else {
 				return;
 			}
@@ -150,17 +157,18 @@ void getPreviousTargetWords(const Hypothesis& cur_hypo, int previousWordsNeeded,
 	}
 }
 
-void getSourceWords(const TargetPhrase &targetPhrase,
-		const Sentence &sourceSentence, vector<string> &sourceWords) {
+void CoarseBiLM::getSourceWords(const TargetPhrase &targetPhrase,
+		const Sentence &sourceSentence,
+		std::vector<std::string> &sourceWords) const {
 	/*std::size_t sourceBegin = cur_hypo.GetCurrSourceWordsRange().GetStartPos();
-	std::size_t sourceEnd = cur_hypo.GetCurrSourceWordsRange().GetEndPos();
-	if (sourceBegin != sourceEnd) {
-		for (int index = sourceBegin; index <= sourceEnd; index++) {
-			sourceWords.push_back(sourceInput.GetWord(index).ToString());
-		}
-	} else {
-		sourceWords.push_back(sourceInput.GetWord(sourceBegin).ToString());
-	}*/
+	 std::size_t sourceEnd = cur_hypo.GetCurrSourceWordsRange().GetEndPos();
+	 if (sourceBegin != sourceEnd) {
+	 for (int index = sourceBegin; index <= sourceEnd; index++) {
+	 sourceWords.push_back(sourceInput.GetWord(index).ToString());
+	 }
+	 } else {
+	 sourceWords.push_back(sourceInput.GetWord(sourceBegin).ToString());
+	 }*/
 }
 
 FFState* CoarseBiLM::EvaluateWhenApplied(const ChartHypothesis& /* cur_hypo */,
@@ -185,8 +193,7 @@ void CoarseBiLM::SetParameter(const std::string& key,
 	} else if (key == "ngrams") {
 		nGramOrder = boost::lexical_cast<int>(value);
 		//TODO: look at previous phrases
-	}
-	else {
+	} else {
 		StatefulFeatureFunction::SetParameter(key, value);
 	}
 }
@@ -195,7 +202,7 @@ std::map<std::string, std::string> CoarseBiLM::LoadManyToOneMap(
 		const std::string& path) {
 	std::cerr << "LoadManyToOneMap Value: " + path << std::endl;
 
-	std::map < std::string, std::string > manyToOneMap;
+	std::map<std::string, std::string> manyToOneMap;
 	manyToOneMap["testKey"] = "testValue";
 	return manyToOneMap;
 }
