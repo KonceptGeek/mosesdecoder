@@ -23,6 +23,7 @@ protected:
 	std::map<std::string, std::string> srcWordToClusterId;
 	std::map<std::string, std::string> bitokenToBitokenId;
 	std::map<std::string, std::string> bitokenIdToClusterId;
+	int nGramOrder;
 
 public:
 	CoarseBiLM(const std::string &line);
@@ -56,6 +57,12 @@ public:
 	void SetParameter(const std::string& key, const std::string& value);
 
 	std::map<std::string, std::string> LoadManyToOneMap(const std::string& path);
+	
+	void getTargetWords(const Hypothesis& cur_hypo, vector<string> &targetWords);
+	
+	void getPreviousTargetWords(const Hypothesis& cur_hypo, int previousWordsNeeded, vector<string> &targetWords);
+	
+	void getSourceWords(const TargetPhrase &targetPhrase, const Sentence &sourceSentence, vector<string> &sourceWords);
 };
 
 }

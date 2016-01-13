@@ -8,6 +8,7 @@
 #include "moses/Manager.h"
 #include "moses/InputType.h"
 #include "moses/Word.h"
+#include "moses/Sentence.h"
 
 using namespace std;
 
@@ -72,17 +73,55 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 	// sparse scores
 	accumulator->PlusEquals(this, "sparse-name", 2.4);
 
+	vector < string > targetWords;
+	vector < string > sourceWords;
+
 	TargetPhrase currTargetPhrase = cur_hypo.GetCurrTargetPhrase();
-	AlignmentInfo alignTerm = currTargetPhrase.GetAlignTerm();
-	AlignmentInfo::CollType alignments = alignTerm.GetAlignments();
+	Manager& manager = cur_hypo.GetManager();
+	const Sentence& sourceSentence =
+			static_cast<const Sentence&>(manager.GetSource());
 
+	const InputType& sourceInput = manager.GetSource();
 
+	/*
+	 * Get target words. Also, get the previous hypothesised target words.
+	 */
+	getTargetWords(cur_hypo, targetWords);
+
+	/*
+	 * Get aligned source words in the source sentence. 
+	 */
+	getSourceWords(currTargetPhrase, sourceSentence, sourceWords);
+
+	for (vector<string>::const_iterator iterator = sourceWords.begin();
+			iterator != sourceWords.end(); iterator++)
+		std::cerr << " " << *iterator;
+	std::cerr << endl;
+
+	for (vector<string>::const_iterator iterator = targetWords.begin();
+			iterator != targetWords.end(); iterator++)
+		std::cerr << " " << *iterator;
+	std::cerr << endl;
+
+	return new CoarseBiLMState(0);
+}
+
+void CoarseBiLM::getTargetWords(const Hypothesis& cur_hypo,
+		vector<string> &targetWords) {
 	std::size_t targetBegin = cur_hypo.GetCurrTargetWordsRange().GetStartPos();
 	std::size_t targetEnd = cur_hypo.GetCurrTargetWordsRange().GetEndPos();
-	std::size_t sourceBegin = cur_hypo.GetCurrSourceWordsRange().GetStartPos();
-	std::size_t sourceEnd = cur_hypo.GetCurrSourceWordsRange().GetEndPos();
-
-	vector<string> targetWords;
+	
+	int currentTargetPhraseSize = cur_hypo.GetCurrTargetPhrase().GetSize();
+	int previousWordsNeeded = nGramOrder - currentTargetPhraseSize;
+	vector<string> previousWords;
+	
+	//Get previous target words
+	getPreviousTargetWords(cur_hypo, previousWordsNeeded, previousWords);
+	
+	for (int i = previousWordsNeeded - 1; i >= 0; i--) {
+		targetWords.push_back(previousWords[i]);
+	}
+	
 	if (targetBegin != targetEnd) {
 		for (int index = targetBegin; index <= targetEnd; index++) {
 			targetWords.push_back(cur_hypo.GetWord(index).ToString());
@@ -91,39 +130,37 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 		targetWords.push_back(cur_hypo.GetWord(targetBegin).ToString());
 	}
 
-	Manager& manager = cur_hypo.GetManager();
-	const InputType& sourceInput = manager.GetSource();
+}
 
-	vector<string> sourceWords;
+void getPreviousTargetWords(const Hypothesis& cur_hypo, int previousWordsNeeded, vector<string> &targetWords) {
+	const Hypothesis * prevHypo = cur_hypo.GetPrevHypo();
+	int found = 0;
+	
+	while(prevHypo && found != previousWordsNeeded) {
+		const TargetPhrase& currTargetPhrase = prevHypo->GetCurrTargetPhrase();
+		for (int i = currTargetPhrase.GetSize() - 1; i> -1; i--) {
+			if (found != previouWordsNeeded) {
+				const Word& word = currTargetPhrase.GetWord(i);
+				targetWords.push_front(word.ToString());
+			} else {
+				return;
+			}
+		}
+		prevHypo = prevHypo->GetPrevHypo();
+	}
+}
+
+void getSourceWords(const TargetPhrase &targetPhrase,
+		const Sentence &sourceSentence, vector<string> &sourceWords) {
+	/*std::size_t sourceBegin = cur_hypo.GetCurrSourceWordsRange().GetStartPos();
+	std::size_t sourceEnd = cur_hypo.GetCurrSourceWordsRange().GetEndPos();
 	if (sourceBegin != sourceEnd) {
 		for (int index = sourceBegin; index <= sourceEnd; index++) {
 			sourceWords.push_back(sourceInput.GetWord(index).ToString());
 		}
 	} else {
 		sourceWords.push_back(sourceInput.GetWord(sourceBegin).ToString());
-	}
-
-	std::cerr
-			<< "Printing list, source: "
-					+ boost::lexical_cast<std::string>(sourceWords.size())
-			<< std::endl;
-
-	std::cerr << "Printing list, source and then target: " << std::endl;
-	for (vector<string>::const_iterator iterator = sourceWords.begin();
-			iterator != sourceWords.end(); iterator++)
-		std::cerr << " " << *iterator;
-	std::cerr << endl;
-
-	std::cerr
-			<< "Printing list, target: "
-					+ boost::lexical_cast<std::string>(targetWords.size())
-			<< std::endl;
-	for (vector<string>::const_iterator iterator = targetWords.begin();
-			iterator != targetWords.end(); iterator++)
-		std::cerr << " " << *iterator;
-	std::cerr << endl;
-
-	return new CoarseBiLMState(0);
+	}*/
 }
 
 FFState* CoarseBiLM::EvaluateWhenApplied(const ChartHypothesis& /* cur_hypo */,
@@ -145,7 +182,11 @@ void CoarseBiLM::SetParameter(const std::string& key,
 		bitokenIdToClusterId = LoadManyToOneMap(value);
 	} else if (key == "lm") {
 		//TODO: load language model
-	} else {
+	} else if (key == "ngrams") {
+		nGramOrder = boost::lexical_cast<int>(value);
+		//TODO: look at previous phrases
+	}
+	else {
 		StatefulFeatureFunction::SetParameter(key, value);
 	}
 }
@@ -154,7 +195,7 @@ std::map<std::string, std::string> CoarseBiLM::LoadManyToOneMap(
 		const std::string& path) {
 	std::cerr << "LoadManyToOneMap Value: " + path << std::endl;
 
-	std::map<std::string, std::string> manyToOneMap;
+	std::map < std::string, std::string > manyToOneMap;
 	manyToOneMap["testKey"] = "testValue";
 	return manyToOneMap;
 }
