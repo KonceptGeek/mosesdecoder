@@ -8,6 +8,7 @@
 #include "moses/Manager.h"
 #include "moses/InputType.h"
 #include "moses/Word.h"
+#include "moses/AlignmentInfo.h"
 
 using namespace std;
 
@@ -74,18 +75,24 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
 	vector<string> targetWords;
 	vector<string> sourceWords;
+	std::map<int, int> alignments;
 
 	TargetPhrase currTargetPhrase = cur_hypo.GetCurrTargetPhrase();
 	Manager& manager = cur_hypo.GetManager();
 	const Sentence& sourceSentence =
 			static_cast<const Sentence&>(manager.GetSource());
 
-	const InputType& sourceInput = manager.GetSource();
+	std::set<size_t> align1 = cur_hypo.GetCurrTargetPhrase().GetAlignTerm().GetAlignmentsForTarget(cur_hypo.GetCurrTargetWordsRange().GetStartPos());
+	std::set<size_t> align2 = cur_hypo.GetCurrTargetPhrase().GetAlignNonTerm().GetAlignmentsForTarget(cur_hypo.GetCurrTargetWordsRange().GetStartPos());
+
+	std::cerr << "AlignSize1: " + boost::lexical_cast<string>(align1.size()) << std::endl;
+
+	std::cerr << "AlignSize2: " + boost::lexical_cast<string>(align2.size()) << std::endl;
 
 	/*
 	 * Get target words. Also, get the previous hypothesised target words.
 	 */
-	getTargetWords(cur_hypo, targetWords);
+	getTargetWords(cur_hypo, targetWords, alignments);
 
 	/*
 	 * Get aligned source words in the source sentence. 
@@ -93,22 +100,23 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 	getSourceWords(currTargetPhrase, sourceSentence, sourceWords);
 
 	for (vector<string>::const_iterator iterator = sourceWords.begin();
-			iterator != sourceWords.end(); iterator++)
+			iterator != sourceWords.end(); iterator++) {
 		std::cerr << " " << *iterator;
+	}
 	std::cerr << endl;
 
 	for (vector<string>::const_iterator iterator = targetWords.begin();
-			iterator != targetWords.end(); iterator++)
+			iterator != targetWords.end(); iterator++) {
 		std::cerr << " " << *iterator;
+	}
 	std::cerr << endl;
 
 	return new CoarseBiLMState(0);
 }
 
 void CoarseBiLM::getTargetWords(const Hypothesis& cur_hypo,
-		std::vector<std::string> &targetWords) const {
-	std::size_t targetBegin = cur_hypo.GetCurrTargetWordsRange().GetStartPos();
-	std::size_t targetEnd = cur_hypo.GetCurrTargetWordsRange().GetEndPos();
+		std::vector<std::string> &targetWords,
+		std::map<int, int> &alignments) const {
 
 	int currentTargetPhraseSize = cur_hypo.GetCurrTargetPhrase().GetSize();
 	int previousWordsNeeded = nGramOrder - currentTargetPhraseSize;
@@ -116,29 +124,28 @@ void CoarseBiLM::getTargetWords(const Hypothesis& cur_hypo,
 	if (previousWordsNeeded > 0) {
 		vector<string> previousWords(previousWordsNeeded);
 		//Get previous target words
-		getPreviousTargetWords(cur_hypo, previousWordsNeeded, previousWords);
+		getPreviousTargetWords(cur_hypo, previousWordsNeeded, previousWords,
+				alignments);
 
 		for (int i = previousWords.size() - 1; i >= 0; i--) {
 			string previousWord = previousWords[i];
 			boost::algorithm::trim(previousWord);
-			if(!previousWord.empty()) {
+			if (!previousWord.empty()) {
 				targetWords.push_back(previousWords[i]);
 			}
 		}
 	}
 
-	if (targetBegin != targetEnd) {
-		for (int index = targetBegin; index <= targetEnd; index++) {
-			targetWords.push_back(cur_hypo.GetWord(index).ToString());
-		}
-	} else {
-		targetWords.push_back(cur_hypo.GetWord(targetBegin).ToString());
+	std::size_t targetBegin = cur_hypo.GetCurrTargetWordsRange().GetStartPos();
+	for (int index = 0; index < currentTargetPhraseSize; index++) {
+		targetWords.push_back(cur_hypo.GetWord(targetBegin + index).ToString());
 	}
 
 }
 
 void CoarseBiLM::getPreviousTargetWords(const Hypothesis& cur_hypo,
-		int previousWordsNeeded, std::vector<std::string> &targetWords) const {
+		int previousWordsNeeded, std::vector<std::string> &targetWords,
+		std::map<int, int> &alignments) const {
 	const Hypothesis * prevHypo = cur_hypo.GetPrevHypo();
 	int found = 0;
 

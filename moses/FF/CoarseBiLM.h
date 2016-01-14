@@ -62,9 +62,9 @@ public:
 private:
 	std::map<std::string, std::string> LoadManyToOneMap(const std::string& path);
 	
-	void getTargetWords(const Hypothesis& cur_hypo, std::vector<std::string> &targetWords) const;
+	void getTargetWords(const Hypothesis& cur_hypo, std::vector<std::string> &targetWords, std::map<int, int> &alignments) const;
 	
-	void getPreviousTargetWords(const Hypothesis& cur_hypo, int previousWordsNeeded, std::vector<std::string> &targetWords) const;
+	void getPreviousTargetWords(const Hypothesis& cur_hypo, int previousWordsNeeded, std::vector<std::string> &targetWords, std::map<int, int> &alignments) const;
 	
 	void getSourceWords(const TargetPhrase &targetPhrase, const Sentence &sourceSentence, std::vector<std::string> &sourceWords) const;
 };
