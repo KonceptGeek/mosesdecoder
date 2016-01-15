@@ -11,7 +11,6 @@ namespace Moses
 {
 
 class Manager;
-class InputType;
 class TranslationOptionCollection;
 
 /** Functions and variables you need to decoder an input using the
@@ -21,7 +20,6 @@ class TranslationOptionCollection;
 class SearchNormal: public Search
 {
 protected:
-  const InputType &m_source;
   //! stacks to store hypotheses (partial translations)
   // no of elements = no of words in source + 1
   std::vector < HypothesisStack* > m_hypoStackColl;
@@ -44,11 +42,14 @@ protected:
   ExpandAllHypotheses(const Hypothesis &hypothesis, size_t startPos, size_t endPos);
 
   virtual void
-  ExpandHypothesis(const Hypothesis &hypothesis, const TranslationOption &transOpt,
-                   float expectedScore);
+  ExpandHypothesis(const Hypothesis &hypothesis,
+                   const TranslationOption &transOpt,
+                   float expectedScore,
+                   float estimatedScore,
+                   const Bitmap &bitmap);
 
 public:
-  SearchNormal(Manager& manager, const InputType &source, const TranslationOptionCollection &transOptColl);
+  SearchNormal(Manager& manager, const TranslationOptionCollection &transOptColl);
   ~SearchNormal();
 
   void Decode();

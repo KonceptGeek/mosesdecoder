@@ -66,7 +66,7 @@ public:
   void EvaluateInIsolation(const Phrase &source
                            , const TargetPhrase &targetPhrase
                            , ScoreComponentCollection &scoreBreakdown
-                           , ScoreComponentCollection &estimatedFutureScore) const
+                           , ScoreComponentCollection &estimatedScores) const
   {};
 
   void EvaluateWithSourceContext(const InputType &input
@@ -74,7 +74,7 @@ public:
                                  , const TargetPhrase &targetPhrase
                                  , const StackVec *stackVec
                                  , ScoreComponentCollection &scoreBreakdown
-                                 , ScoreComponentCollection *estimatedFutureScore = NULL) const;
+                                 , ScoreComponentCollection *estimatedScores = NULL) const;
 
   void EvaluateTranslationOptionListWithSourceContext(const InputType &input
       , const TranslationOptionList &translationOptionList) const
@@ -99,7 +99,7 @@ private:
   Model1LexicalTable m_model1;
   const Factor* m_emptyWord;
 
-  void Load();
+  void Load(AllOptions::ptr const& opts);
 
   // cache
   mutable boost::unordered_map<const InputType*, boost::unordered_map<const Factor*, float> > m_cache;

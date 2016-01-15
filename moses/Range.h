@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define moses_WordsRange_h
 
 #include <iostream>
+#include <boost/functional/hash.hpp>
 #include "TypeDef.h"
 #include "Util.h"
 #include "util/exception.hh"
@@ -35,17 +36,18 @@ namespace Moses
 {
 
 /***
- * Efficient version of WordsBitmap for contiguous ranges
+ * Efficient version of Bitmap for contiguous ranges
  */
-class WordsRange
+class Range
 {
-  friend std::ostream& operator << (std::ostream& out, const WordsRange& range);
+  friend std::ostream& operator << (std::ostream& out, const Range& range);
 
   // m_endPos is inclusive
   size_t m_startPos, m_endPos;
 public:
-  inline WordsRange(size_t startPos, size_t endPos) : m_startPos(startPos), m_endPos(endPos) {}
-  inline WordsRange(const WordsRange &copy)
+  inline explicit Range() {}
+  inline Range(size_t startPos, size_t endPos) : m_startPos(startPos), m_endPos(endPos) {}
+  inline Range(const Range &copy)
     : m_startPos(copy.GetStartPos())
     , m_endPos(copy.GetEndPos()) {
   }
@@ -63,24 +65,24 @@ public:
   }
 
   //! transitive comparison
-  inline bool operator<(const WordsRange& x) const {
+  inline bool operator<(const Range& x) const {
     return (m_startPos<x.m_startPos
             || (m_startPos==x.m_startPos && m_endPos<x.m_endPos));
   }
 
   // equality operator
-  inline bool operator==(const WordsRange& x) const {
+  inline bool operator==(const Range& x) const {
     return (m_startPos==x.m_startPos && m_endPos==x.m_endPos);
   }
   // Whether two word ranges overlap or not
-  inline bool Overlap(const WordsRange& x) const {
+  inline bool Overlap(const Range& x) const {
 
     if ( x.m_endPos < m_startPos || x.m_startPos > m_endPos) return false;
 
     return true;
   }
 
-  inline size_t GetNumWordsBetween(const WordsRange& x) const {
+  inline size_t GetNumWordsBetween(const Range& x) const {
     UTIL_THROW_IF2(Overlap(x), "Overlapping ranges");
 
     if (x.m_endPos < m_startPos) {
@@ -94,6 +96,12 @@ public:
   TO_STRING();
 };
 
+inline size_t hash_value(const Range& range)
+{
+  size_t  seed = range.GetStartPos();
+  boost::hash_combine(seed, range.GetEndPos());
+  return seed;
+}
 
 }
 #endif

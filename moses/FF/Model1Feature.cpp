@@ -159,8 +159,9 @@ void Model1Feature::SetParameter(const std::string& key, const std::string& valu
   }
 }
 
-void Model1Feature::Load()
+void Model1Feature::Load(AllOptions::ptr const& opts)
 {
+  m_options = opts;
   FEATUREVERBOSE(2, GetScoreProducerDescription() << ": Loading source vocabulary from file " << m_fileNameVcbS << " ...");
   Model1Vocabulary vcbS;
   vcbS.Load(m_fileNameVcbS);
@@ -183,7 +184,7 @@ void Model1Feature::EvaluateWithSourceContext(const InputType &input
     , const TargetPhrase &targetPhrase
     , const StackVec *stackVec
     , ScoreComponentCollection &scoreBreakdown
-    , ScoreComponentCollection *estimatedFutureScore) const
+    , ScoreComponentCollection *estimatedScores) const
 {
   const Sentence& sentence = static_cast<const Sentence&>(input);
   float score = 0.0;

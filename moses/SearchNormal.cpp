@@ -16,23 +16,12 @@ namespace Moses
  * /param transOptColl collection of translation options to be used for this sentence
  */
 SearchNormal::
-SearchNormal(Manager& manager, const InputType &source,
-             const TranslationOptionCollection &transOptColl)
+SearchNormal(Manager& manager, const TranslationOptionCollection &transOptColl)
   : Search(manager)
-  , m_source(source)
-  , m_hypoStackColl(source.GetSize() + 1)
+  , m_hypoStackColl(manager.GetSource().GetSize() + 1)
   , m_transOptColl(transOptColl)
 {
   VERBOSE(1, "Translating: " << m_source << endl);
-
-  // m_beam_width = manager.options().search.beam_width;
-  // m_stack_size = manager.options().search.stack_size;
-  // m_stack_diversity = manager.options().search.stack_diversity;
-  // m_timeout = manager.options().search.timeout;
-  // m_max_distortion = manager.options().reordering.max_distortion;
-
-  // only if constraint decoding (having to match a specified output)
-  // long sentenceID = source.GetTranslationId();
 
   // initialize the stacks: create data structure and set limits
   std::vector < HypothesisStackNormal >::iterator iterStack;
@@ -83,10 +72,10 @@ ProcessOneStack(HypothesisStack* hstack)
  */
 void SearchNormal::Decode()
 {
-  // SentenceStats &stats = m_manager.GetSentenceStats();
-
   // initial seed hypothesis: nothing translated, no words produced
-  Hypothesis *hypo = Hypothesis::Create(m_manager, m_source, m_initialTransOpt);
+  const Bitmap &initBitmap = m_bitmaps.GetInitialBitmap();
+  Hypothesis *hypo = new Hypothesis(m_manager, m_source, m_initialTransOpt, initBitmap, m_manager.GetNextHypoId());
+
   m_hypoStackColl[0]->AddPrune(hypo);
 
   // go through each stack
@@ -108,10 +97,9 @@ SearchNormal::
 ProcessOneHypothesis(const Hypothesis &hypothesis)
 {
   // since we check for reordering limits, its good to have that limit handy
-  // int maxDistortion  = StaticData::Instance().GetMaxDistortion();
   bool isWordLattice = m_source.GetType() == WordLatticeInput;
 
-  const WordsBitmap hypoBitmap = hypothesis.GetWordsBitmap();
+  const Bitmap &hypoBitmap = hypothesis.GetWordsBitmap();
   const size_t hypoFirstGapPos = hypoBitmap.GetFirstGapPos();
   size_t const sourceSize = m_source.GetSize();
 
@@ -128,7 +116,7 @@ ProcessOneHypothesis(const Hypothesis &hypothesis)
            tol && endPos < sourceSize;
            tol = m_transOptColl.GetTranslationOptionList(startPos, ++endPos)) {
         if (tol->size() == 0
-            || hypoBitmap.Overlap(WordsRange(startPos, endPos))
+            || hypoBitmap.Overlap(Range(startPos, endPos))
             || !ReoConstraint.Check(hypoBitmap, startPos, endPos)) {
           continue;
         }
@@ -142,7 +130,7 @@ ProcessOneHypothesis(const Hypothesis &hypothesis)
 
   // There are reordering limits. Make sure they are not violated.
 
-  WordsRange prevRange = hypothesis.GetCurrSourceWordsRange();
+  Range prevRange = hypothesis.GetCurrSourceWordsRange();
   for (size_t startPos = hypoFirstGapPos ; startPos < sourceSize ; ++startPos) {
 
     // don't bother expanding phrases if the first position is already taken
@@ -173,7 +161,7 @@ ProcessOneHypothesis(const Hypothesis &hypothesis)
         continue;
     }
 
-    WordsRange currentStartRange(startPos, startPos);
+    Range currentStartRange(startPos, startPos);
     if(m_source.ComputeDistortionDistance(prevRange, currentStartRange)
         > m_options.reordering.max_distortion)
       continue;
@@ -183,7 +171,7 @@ ProcessOneHypothesis(const Hypothesis &hypothesis)
     for (tol = m_transOptColl.GetTranslationOptionList(startPos, endPos);
          tol && endPos < sourceSize;
          tol = m_transOptColl.GetTranslationOptionList(startPos, ++endPos)) {
-      WordsRange extRange(startPos, endPos);
+      Range extRange(startPos, endPos);
       if (tol->size() == 0
           || hypoBitmap.Overlap(extRange)
           || !ReoConstraint.Check(hypoBitmap, startPos, endPos)
@@ -221,7 +209,7 @@ ProcessOneHypothesis(const Hypothesis &hypothesis)
         // be (which will always be the value of the hypothesis starting
         // at the left-most edge).  If this value is less than the
         // distortion limit, we don't allow this extension to be made.
-        WordsRange bestNextExtension(hypoFirstGapPos, hypoFirstGapPos);
+        Range bestNextExtension(hypoFirstGapPos, hypoFirstGapPos);
 
         if (m_source.ComputeDistortionDistance(extRange, bestNextExtension)
             > m_options.reordering.max_distortion) continue;
@@ -248,23 +236,32 @@ ExpandAllHypotheses(const Hypothesis &hypothesis, size_t startPos, size_t endPos
   // early discarding: check if hypothesis is too bad to build
   // this idea is explained in (Moore&Quirk, MT Summit 2007)
   float expectedScore = 0.0f;
+
+  const Bitmap &sourceCompleted = hypothesis.GetWordsBitmap();
+  float estimatedScore = m_transOptColl.GetEstimatedScores().CalcEstimatedScore( sourceCompleted, startPos, endPos );
+
   if (m_options.search.UseEarlyDiscarding()) {
     // expected score is based on score of current hypothesis
     expectedScore = hypothesis.GetScore();
 
     // add new future score estimate
-    expectedScore +=
-      m_transOptColl.GetFutureScore()
-      .CalcFutureScore(hypothesis.GetWordsBitmap(), startPos, endPos);
+    expectedScore += estimatedScore;
   }
 
   // loop through all translation options
   const TranslationOptionList* tol
   = m_transOptColl.GetTranslationOptionList(startPos, endPos);
-  if (!tol) return;
+  if (!tol || tol->size() == 0) return;
+
+  // Create new bitmap
+  const TranslationOption &transOpt = **tol->begin();
+  const Range &nextRange = transOpt.GetSourceWordsRange();
+  const Bitmap &nextBitmap = m_bitmaps.GetBitmap(sourceCompleted, nextRange);
+
   TranslationOptionList::const_iterator iter;
   for (iter = tol->begin() ; iter != tol->end() ; ++iter) {
-    ExpandHypothesis(hypothesis, **iter, expectedScore);
+    const TranslationOption &transOpt = **iter;
+    ExpandHypothesis(hypothesis, transOpt, expectedScore, estimatedScore, nextBitmap);
   }
 }
 
@@ -277,9 +274,12 @@ ExpandAllHypotheses(const Hypothesis &hypothesis, size_t startPos, size_t endPos
  * \param expectedScore base score for early discarding
  *        (base hypothesis score plus future score estimation)
  */
-void SearchNormal::ExpandHypothesis(const Hypothesis &hypothesis, const TranslationOption &transOpt, float expectedScore)
+void SearchNormal::ExpandHypothesis(const Hypothesis &hypothesis,
+                                    const TranslationOption &transOpt,
+                                    float expectedScore,
+                                    float estimatedScore,
+                                    const Bitmap &bitmap)
 {
-  const StaticData &staticData = StaticData::Instance();
   SentenceStats &stats = m_manager.GetSentenceStats();
 
   Hypothesis *newHypo;
@@ -288,12 +288,29 @@ void SearchNormal::ExpandHypothesis(const Hypothesis &hypothesis, const Translat
     IFVERBOSE(2) {
       stats.StartTimeBuildHyp();
     }
-    newHypo = hypothesis.CreateNext(transOpt);
+    newHypo = new Hypothesis(hypothesis, transOpt, bitmap, m_manager.GetNextHypoId());
     IFVERBOSE(2) {
       stats.StopTimeBuildHyp();
     }
     if (newHypo==NULL) return;
-    newHypo->EvaluateWhenApplied(m_transOptColl.GetFutureScore());
+
+    IFVERBOSE(2) {
+      m_manager.GetSentenceStats().StartTimeOtherScore();
+    }
+    newHypo->EvaluateWhenApplied(estimatedScore);
+    IFVERBOSE(2) {
+      m_manager.GetSentenceStats().StopTimeOtherScore();
+
+      // TODO: these have been meaningless for a while.
+      // At least since commit 67fb5c
+      // should now be measured in SearchNormal.cpp:254 instead, around CalcFutureScore2()
+      // CalcFutureScore2() also called in BackwardsEdge::Initialize().
+      //
+      // however, CalcFutureScore2() should be quick
+      // since it uses dynamic programming results in SquareMatrix
+      m_manager.GetSentenceStats().StartTimeEstimateScore();
+      m_manager.GetSentenceStats().StopTimeEstimateScore();
+    }
   } else
     // early discarding: check if hypothesis is too bad to build
   {
@@ -305,7 +322,7 @@ void SearchNormal::ExpandHypothesis(const Hypothesis &hypothesis, const Translat
       float allowedScoreForBitmap = m_hypoStackColl[wordsTranslated]->GetWorstScoreForBitmap( id );
       allowedScore = std::min( allowedScore, allowedScoreForBitmap );
     }
-    allowedScore += staticData.GetEarlyDiscardingThreshold();
+    allowedScore += m_options.search.early_discarding_threshold;
 
     // add expected score of translation option
     expectedScore += transOpt.GetFutureScore();
@@ -322,7 +339,7 @@ void SearchNormal::ExpandHypothesis(const Hypothesis &hypothesis, const Translat
     IFVERBOSE(2) {
       stats.StartTimeBuildHyp();
     }
-    newHypo = hypothesis.CreateNext(transOpt);
+    newHypo = new Hypothesis(hypothesis, transOpt, bitmap, m_manager.GetNextHypoId());
     if (newHypo==NULL) return;
     IFVERBOSE(2) {
       stats.StopTimeBuildHyp();
@@ -333,7 +350,7 @@ void SearchNormal::ExpandHypothesis(const Hypothesis &hypothesis, const Translat
       IFVERBOSE(2) {
         stats.AddEarlyDiscarded();
       }
-      FREEHYPO( newHypo );
+      delete newHypo;
       return;
     }
 

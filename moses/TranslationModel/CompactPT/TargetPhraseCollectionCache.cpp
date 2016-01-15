@@ -1,3 +1,5 @@
+// $Id$
+// vim:tabstop=2
 /***********************************************************************
 Moses - factored phrase-based language decoder
 Copyright (C) 2006 University of Edinburgh
@@ -17,18 +19,14 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 ***********************************************************************/
 
-#include "WordsRange.h"
+#include "TargetPhraseCollectionCache.h"
 
 namespace Moses
 {
 
-TO_STRING_BODY(WordsRange);
 
-std::ostream& operator << (std::ostream& out, const WordsRange& range)
-{
-  out << "[" << range.m_startPos << ".." << range.m_endPos << "]";
-  return out;
-}
+boost::thread_specific_ptr<TargetPhraseCollectionCache::CacheMap>
+TargetPhraseCollectionCache::m_phraseCache;
 
 }
 

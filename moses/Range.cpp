@@ -1,5 +1,3 @@
-// $Id$
-
 /***********************************************************************
 Moses - factored phrase-based language decoder
 Copyright (C) 2006 University of Edinburgh
@@ -19,19 +17,18 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 ***********************************************************************/
 
-#include "WordsBitmap.h"
+#include "Range.h"
 
 namespace Moses
 {
 
-TO_STRING_BODY(WordsBitmap);
+TO_STRING_BODY(Range);
 
-bool WordsBitmap::IsAdjacent(size_t startPos, size_t endPos) const
+std::ostream& operator << (std::ostream& out, const Range& range)
 {
-  return
-    GetNumWordsCovered() == 0 ||
-    startPos == GetFirstGapPos() ||
-    endPos == GetLastGapPos();
+  out << "[" << range.m_startPos << ".." << range.m_endPos << "]";
+  return out;
 }
 
 }
+
