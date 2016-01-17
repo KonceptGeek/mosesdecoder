@@ -1,22 +1,41 @@
 #pragma once
 
+#include <vector>
 #include <string>
 #include "StatefulFeatureFunction.h"
 #include "FFState.h"
+#include "moses/Sentence.h"
+#include "moses/TargetPhrase.h"
 
 namespace Moses {
 
-class CoarseBiLMState: public FFState {
-	int m_targetLen;
+class CoarseBiLMState : public FFState
+{
+  int m_targetLen;
 public:
-	CoarseBiLMState(int targetLen) :
-			m_targetLen(targetLen) {
-	}
+  CoarseBiLMState(int targetLen)
+    :m_targetLen(targetLen) {
+  }
 
-	int Compare(const FFState& other) const;
+  virtual size_t hash() const {
+    return (size_t) m_targetLen;
+  }
+  virtual bool operator==(const FFState& o) const {
+    const CoarseBiLMState& other = static_cast<const CoarseBiLMState&>(o);
+    return m_targetLen == other.m_targetLen;
+  }
+
 };
 
 class CoarseBiLM: public StatefulFeatureFunction {
+
+protected:
+	std::map<std::string, std::string> tgtWordToClusterId;
+	std::map<std::string, std::string> srcWordToClusterId;
+	std::map<std::string, std::string> bitokenToBitokenId;
+	std::map<std::string, std::string> bitokenIdToClusterId;
+	int nGramOrder;
+
 public:
 	CoarseBiLM(const std::string &line);
 
@@ -48,6 +67,22 @@ public:
 
 	void SetParameter(const std::string& key, const std::string& value);
 
+private:
+	void LoadManyToOneMap(const std::string& path, std::map<std::string, std::string> &manyToOneMap);
+	
+	void getTargetWords(const Hypothesis& cur_hypo, std::vector<std::string> &targetWords, std::map<int, std::vector<int> > &alignments) const;
+	
+	void getPreviousTargetWords(const Hypothesis& cur_hypo, int previousWordsNeeded, std::vector<std::string> &targetWords, std::map<int, std::vector<int> > &alignments) const;
+	
+	void getSourceWords(const Sentence &sourceSentence, std::vector<std::string> &sourceWords) const;
+
+	void replaceWordsWithClusterID(const std::vector<std::string> &words, const std::map<std::string, std::string> &clusterIdMap, std::vector<std::string> &wordClusterIDs) const;
+
+	void createBitokens(const std::vector<std::string> &sourceWords, const std::vector<std::string> &targetWords, const std::map<int, std::vector<int> > &alignments, std::vector<std::string> &bitokens) const;
+
+	size_t getState(const Hypothesis& cur_hypo) const;
+
+	void printList(const std::vector<std::string> &listToPrint) const;
 };
 
 }

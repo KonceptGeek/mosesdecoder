@@ -60,6 +60,7 @@
 #include "SpanLength.h"
 #include "SyntaxRHS.h"
 #include "DeleteRules.h"
+#include "moses/FF/CoarseBiLM.h"
 
 #include "moses/FF/SkeletonStatelessFF.h"
 #include "moses/FF/SkeletonStatefulFF.h"
@@ -281,6 +282,7 @@ FeatureRegistry::FeatureRegistry()
   MOSES_FNAME(PhraseOrientationFeature);
   MOSES_FNAME(UnalignedWordCountFeature);
   MOSES_FNAME(DeleteRules);
+  MOSES_FNAME(CoarseBiLM);
 
   MOSES_FNAME(SkeletonStatelessFF);
   MOSES_FNAME(SkeletonStatefulFF);
