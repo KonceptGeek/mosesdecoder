@@ -10,15 +10,31 @@
 #include "moses/InputType.h"
 #include "moses/Word.h"
 #include "moses/AlignmentInfo.h"
+#include "lm/model.hh"
 
 using namespace std;
+using namespace lm::ngram;
 
 namespace Moses {
 
 ////////////////////////////////////////////////////////////////
 CoarseBiLM::CoarseBiLM(const std::string &line) :
 		StatefulFeatureFunction(3, line) {
+      std::cerr << "COARSE CONSTRUCTOR: " << line << std::endl;
+	FactorCollection& factorFactory = FactorCollection::Instance(); //Factor Factory to use for BOS_ and EOS_
+}
+
+CoarseBiLM::~CoarseBiLM() {
+	delete CoarseLM;
+}
+
+void CoarseBiLM::Load(AllOptions::ptr const& opts) {
+	m_options = opts;
+	cvtSrcToClusterId = false;
+	cvtBitokenToBitokenId = false;
+	cvtBitokenIdToClusterId = false;
 	ReadParameters();
+	readLanguageModel(m_lmPath.c_str());
 }
 
 void CoarseBiLM::EvaluateInIsolation(const Phrase &source,
@@ -57,14 +73,6 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 		const FFState* prev_state,
 		ScoreComponentCollection* accumulator) const {
 	// dense scores
-	vector<float> newScores(m_numScoreComponents);
-	newScores[0] = 1.5;
-	newScores[1] = 0.3;
-	newScores[2] = 0.4;
-	accumulator->PlusEquals(this, newScores);
-
-	// sparse scores
-	accumulator->PlusEquals(this, "sparse-name", 2.4);
 
 	vector<string> targetWords;
 	vector<string> sourceWords;
@@ -81,53 +89,91 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 	const Sentence& sourceSentence =
 			static_cast<const Sentence&>(manager.GetSource());
 
-
 	//Get target words. Also, get the previous hypothesised target words.
 	getTargetWords(cur_hypo, targetWords, alignments);
-
-	//Reads the source sentence and fills the sourceWords vector wit source words.
-	getSourceWords(sourceSentence, sourceWords);
-
 	replaceWordsWithClusterID(targetWords, tgtWordToClusterId, targetWordIDs);
+	vector<string> wordsToScore = targetWordIDs;
 
-	replaceWordsWithClusterID(sourceWords, srcWordToClusterId, sourceWordIDs);
-
-	createBitokens(sourceWordIDs, targetWordIDs, alignments, bitokens);
-
-	replaceWordsWithClusterID(bitokens, bitokenToBitokenId, bitokenBitokenIDs);
-
-	replaceWordsWithClusterID(bitokenBitokenIDs, bitokenIdToClusterId, bitokenWordIDs);
-
-	std::cerr << "### Printing Alignments ###" << std::endl;
-	for(std::map<int, std::vector<int> >::const_iterator it = alignments.begin(); it != alignments.end(); it++) {
-		std::cerr << it->first << ":";
-		for(vector<int>::const_iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
-			std::cerr << " " << *it2;
+	if (cvtSrcToClusterId) {
+		//Reads the source sentence and fills the sourceWords vector wit source words.
+		getSourceWords(sourceSentence, sourceWords);
+		replaceWordsWithClusterID(sourceWords, srcWordToClusterId,
+				sourceWordIDs);
+		if (cvtBitokenToBitokenId) {
+			//Create bitokens.
+			createBitokens(sourceWordIDs, targetWordIDs, alignments, bitokens);
+			//Replace bitokens with bitoken tags
+			replaceWordsWithClusterID(bitokens, bitokenToBitokenId,
+					bitokenBitokenIDs);
+			wordsToScore = bitokenBitokenIDs;
+			if (cvtBitokenIdToClusterId) {
+				//Replace bitoken tags with bitoken cluster ids
+				replaceWordsWithClusterID(bitokenBitokenIDs,
+						bitokenIdToClusterId, bitokenWordIDs);
+				wordsToScore = bitokenWordIDs;
+			}
 		}
-		std::cerr << std::endl;
 	}
 
-	std::cerr << "### Printing Target Words ###" << std::endl;
-	printList(targetWords);
+	State state(CoarseLM->BeginSentenceState()), outState;
 
-	std::cerr << "### Printing Source Words ###" << std::endl;
-	printList(sourceWords);
+	//std::cerr << "Scoring Words" << std::endl;
+	float totalScore = 0.0;
+	for (std::vector<std::string>::const_iterator iterator =
+			wordsToScore.begin(); iterator != wordsToScore.end(); iterator++) {
+		std::string word = *iterator;
+		float score = CoarseLM->Score(state, word, outState);
+		//std::cerr << "Word: " << word << ", score: " << score << std::endl;
+		totalScore = totalScore + score;
+		state = outState;
+	}
 
-	std::cerr << "### Printing Target Words Cluster IDs###" << std::endl;
-	printList(targetWordIDs);
+	/*std::cerr << "### Printing Alignments ###" << std::endl;
+	 for(std::map<int, std::vector<int> >::const_iterator it = alignments.begin(); it != alignments.end(); it++) {
+	 std::cerr << it->first << ":";
+	 for(vector<int>::const_iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
+	 std::cerr << " " << *it2;
+	 }
+	 std::cerr << std::endl;
+	 }
 
-	std::cerr << "### Printing Source Words Cluster IDs###" << std::endl;
-	printList(sourceWordIDs);
+	 std::cerr << "### Printing Target Words ###" << std::endl;
+	 printList(targetWords);
 
-	std::cerr << "### Printing Bitokens ###" << std::endl;
-	printList(bitokens);
+	 std::cerr << "### Printing Source Words ###" << std::endl;
+	 printList(sourceWords);
 
-	std::cerr << "### Printing Bitoken-Bitoken IDs ###" << std::endl;
-	printList(bitokenBitokenIDs);
+	 std::cerr << "### Printing Target Words Cluster IDs###" << std::endl;
+	 printList(targetWordIDs);
 
-	std::cerr << "### Printing Bitoken Cluster IDs ###" << std::endl;
-	printList(bitokenWordIDs);
+	 std::cerr << "### Printing Source Words Cluster IDs###" << std::endl;
+	 printList(sourceWordIDs);
+
+	 std::cerr << "### Printing Bitokens ###" << std::endl;
+	 printList(bitokens);
+
+	 std::cerr << "### Printing Bitoken-Bitoken IDs ###" << std::endl;
+	 printList(bitokenBitokenIDs);*/
+  
+  if (cvtBitokenIdToClusterId) {
+    std::cerr << "#### FEATURE FUNCTION: CoarseBiLM" << std::endl;
+  } else if (cvtBitokenToBitokenId) {
+    std::cerr << "#### FEATURE FUNCTION: CoarseBiLMWithoutClustering" << std::endl;
+  } else {
+    std::cerr << "#### FEATURE FUNCTION: CoarseLM" << std::endl;
+  }
+	std::cerr << "### Printing wordsToScore Cluster IDs ###" << std::endl;
+	printList(wordsToScore);
+
+	std::cerr << "### Probabilties ###" << std::endl;
+
+	std::cerr << "Total Score: " << totalScore << std::endl;
+	//std::cerr << "numScoreComponents: " << m_numScoreComponents << std::endl;
 	std::cerr << "### Done For This Sentence ###" << std::endl;
+
+	vector<float> newScores(m_numScoreComponents);
+	newScores[0] = totalScore;
+	accumulator->PlusEquals(this, newScores);
 
 	size_t newState = getState(cur_hypo);
 	return new CoarseBiLMState(newState);
@@ -167,19 +213,24 @@ void CoarseBiLM::getTargetWords(const Hypothesis& cur_hypo,
 		boost::algorithm::trim(word);
 		targetWords.push_back(word);
 		//find alignments for current word
-		std::set<size_t> currWordAlignments = cur_hypo.GetCurrTargetPhrase().GetAlignTerm().GetAlignmentsForTarget(index+targetBegin);
+		std::set<size_t> currWordAlignments =
+				cur_hypo.GetCurrTargetPhrase().GetAlignTerm().GetAlignmentsForTarget(
+						index + targetBegin);
 		size_t sourceBegin = cur_hypo.GetCurrSourceWordsRange().GetStartPos();
 
 		//add alignments to map
-		for(std::set<size_t>::const_iterator iterator = currWordAlignments.begin(); iterator != currWordAlignments.end(); iterator++) {
-			std::map<int, vector<int> >::iterator it = alignments.find(index+targetBegin);
+		for (std::set<size_t>::const_iterator iterator =
+				currWordAlignments.begin();
+				iterator != currWordAlignments.end(); iterator++) {
+			std::map<int, vector<int> >::iterator it = alignments.find(
+					index + targetBegin);
 			vector<int> alignedSourceIndices;
-			if(it != alignments.end()) {
+			if (it != alignments.end()) {
 				//found vector of indices
 				alignedSourceIndices = it->second;
 			}
-			alignedSourceIndices.push_back((*iterator)+sourceBegin);
-			alignments[index+targetBegin] = alignedSourceIndices;
+			alignedSourceIndices.push_back((*iterator) + sourceBegin);
+			alignments[index + targetBegin] = alignedSourceIndices;
 		}
 	}
 
@@ -206,16 +257,21 @@ void CoarseBiLM::getPreviousTargetWords(const Hypothesis& cur_hypo,
 				targetWords[found] = word.ToString();
 
 				//find alignments for current word
-				std::set<size_t> currWordAlignments = currTargetPhrase.GetAlignTerm().GetAlignmentsForTarget(i+tpBegin);
+				std::set<size_t> currWordAlignments =
+						currTargetPhrase.GetAlignTerm().GetAlignmentsForTarget(
+								i + tpBegin);
 				//add alignments to map
-				for(std::set<size_t>::const_iterator iterator= currWordAlignments.begin(); iterator != currWordAlignments.end(); iterator++) {
-					std::map<int,vector<int> >::iterator it = alignments.find(i+tpBegin);
+				for (std::set<size_t>::const_iterator iterator =
+						currWordAlignments.begin();
+						iterator != currWordAlignments.end(); iterator++) {
+					std::map<int, vector<int> >::iterator it = alignments.find(
+							i + tpBegin);
 					vector<int> alignedSourceIndices;
-					if(it != alignments.end()) {
+					if (it != alignments.end()) {
 						alignedSourceIndices = it->second;
 					}
-					alignedSourceIndices.push_back((*iterator)+sourceBegin);
-					alignments[i+tpBegin] = alignedSourceIndices;
+					alignedSourceIndices.push_back((*iterator) + sourceBegin);
+					alignments[i + tpBegin] = alignedSourceIndices;
 				}
 
 				found++;
@@ -230,7 +286,8 @@ void CoarseBiLM::getPreviousTargetWords(const Hypothesis& cur_hypo,
 /*
  * Get the words in sourceSentence and fill the sourceWords vector.
  */
-void CoarseBiLM::getSourceWords(const Sentence &sourceSentence, std::vector<std::string> &sourceWords) const {
+void CoarseBiLM::getSourceWords(const Sentence &sourceSentence,
+		std::vector<std::string> &sourceWords) const {
 	for (int index = 0; index < sourceSentence.GetSize(); index++) {
 		string word = sourceSentence.GetWord(index).ToString();
 		boost::algorithm::trim(word);
@@ -238,14 +295,19 @@ void CoarseBiLM::getSourceWords(const Sentence &sourceSentence, std::vector<std:
 	}
 }
 
-void CoarseBiLM::replaceWordsWithClusterID(const std::vector<std::string> &words, const std::map<std::string, std::string> &clusterIdMap, std::vector<std::string> &wordClusterIDs) const {
-	std::cerr << clusterIdMap.size() << std::endl;
-	for(std::vector<std::string>::const_iterator it = words.begin(); it != words.end(); it++) {
+void CoarseBiLM::replaceWordsWithClusterID(
+		const std::vector<std::string> &words,
+		const std::map<std::string, std::string> &clusterIdMap,
+		std::vector<std::string> &wordClusterIDs) const {
+//std::cerr << clusterIdMap.size() << std::endl;
+	for (std::vector<std::string>::const_iterator it = words.begin();
+			it != words.end(); it++) {
 		std::string word = *it;
 		boost::algorithm::trim(word);
-		std::map<std::string, std::string>::const_iterator pos = clusterIdMap.find(word);
-		if(pos == clusterIdMap.end()) {
-			std::cerr << "did not find a value: " << word << std::endl;
+		std::map<std::string, std::string>::const_iterator pos =
+				clusterIdMap.find(word);
+		if (pos == clusterIdMap.end()) {
+			//std::cerr << "did not find a value: " << word << std::endl;
 		} else {
 			std::string clusterId = pos->second;
 			wordClusterIDs.push_back(clusterId);
@@ -253,27 +315,31 @@ void CoarseBiLM::replaceWordsWithClusterID(const std::vector<std::string> &words
 	}
 }
 
-void CoarseBiLM::createBitokens(const std::vector<std::string> &sourceWords, const std::vector<std::string> &targetWords, const std::map<int, std::vector<int> > &alignments, std::vector<std::string> &bitokens) const {
-	for(int index = 0; index < targetWords.size(); index++) {
+void CoarseBiLM::createBitokens(const std::vector<std::string> &sourceWords,
+		const std::vector<std::string> &targetWords,
+		const std::map<int, std::vector<int> > &alignments,
+		std::vector<std::string> &bitokens) const {
+	for (int index = 0; index < targetWords.size(); index++) {
 		string targetWord = targetWords[index];
 		string sourceWord = "";
-		std::map<int, vector<int> >::const_iterator pos = alignments.find(index);
-		if(pos == alignments.end()) {
-			std::cerr << "did not find a value: " << targetWord << std::endl;
+		std::map<int, vector<int> >::const_iterator pos = alignments.find(
+				index);
+		if (pos == alignments.end()) {
+			//std::cerr << "did not find a value: " << targetWord << std::endl;
 			sourceWord = "NULL";
 		} else {
 			vector<int> sourceIndicess = pos->second;
-			for(vector<int>::const_iterator it = sourceIndicess.begin(); it != sourceIndicess.end(); it++) {
+			for (vector<int>::const_iterator it = sourceIndicess.begin();
+					it != sourceIndicess.end(); it++) {
 				sourceWord = sourceWord + "_" + sourceWords[*it];
 			}
 			sourceWord.erase(0, 1);
 		}
-		string bitoken = sourceWord+"-"+targetWord;
-		std::cerr << "Bitoken: " << bitoken << std::endl;
+		string bitoken = sourceWord + "-" + targetWord;
+		//std::cerr << "Bitoken: " << bitoken << std::endl;
 		bitokens.push_back(bitoken);
 	}
 }
-
 
 size_t CoarseBiLM::getState(const Hypothesis& cur_hypo) const {
 
@@ -299,7 +365,8 @@ size_t CoarseBiLM::getState(const Hypothesis& cur_hypo) const {
 
 	std::size_t targetBegin = cur_hypo.GetCurrTargetWordsRange().GetStartPos();
 	for (int index = 0; index < currentTargetPhraseSize; index++) {
-		boost::hash_combine(hashCode, cur_hypo.GetWord(targetBegin + index).ToString());
+		boost::hash_combine(hashCode,
+				cur_hypo.GetWord(targetBegin + index).ToString());
 	}
 
 	return hashCode;
@@ -317,13 +384,16 @@ void CoarseBiLM::SetParameter(const std::string& key,
 	if (key == "tgtWordToClusterId") {
 		LoadManyToOneMap(value, tgtWordToClusterId);
 	} else if (key == "srcWordToClusterId") {
+		cvtSrcToClusterId = true;
 		LoadManyToOneMap(value, srcWordToClusterId);
 	} else if (key == "bitokenToBitokenId") {
+		cvtBitokenToBitokenId = true;
 		LoadManyToOneMap(value, bitokenToBitokenId);
 	} else if (key == "bitokenIdToClusterId") {
+		cvtBitokenIdToClusterId = true;
 		LoadManyToOneMap(value, bitokenIdToClusterId);
 	} else if (key == "lm") {
-		//TODO: load language model
+		m_lmPath = value;
 	} else if (key == "ngrams") {
 		nGramOrder = boost::lexical_cast<int>(value);
 		//TODO: look at previous phrases
@@ -332,7 +402,8 @@ void CoarseBiLM::SetParameter(const std::string& key,
 	}
 }
 
-void CoarseBiLM::LoadManyToOneMap(const std::string& path, std::map<std::string, std::string> &manyToOneMap) {
+void CoarseBiLM::LoadManyToOneMap(const std::string& path,
+		std::map<std::string, std::string> &manyToOneMap) {
 	std::cerr << "LoadManyToOneMap Value: " + path << std::endl;
 
 	std::ifstream file;
@@ -341,8 +412,7 @@ void CoarseBiLM::LoadManyToOneMap(const std::string& path, std::map<std::string,
 	string key;
 	string value;
 
-	while(file >> key >> value) {
-		std::cerr << key << " " << value << std::endl;
+	while (file >> key >> value) {
 		boost::algorithm::trim(key);
 		boost::algorithm::trim(value);
 		manyToOneMap[key] = value;
@@ -350,13 +420,29 @@ void CoarseBiLM::LoadManyToOneMap(const std::string& path, std::map<std::string,
 	file.close();
 }
 
-void CoarseBiLM::printList(const std::vector<std::string> &listToPrint) const{
-	for (std::vector<std::string>::const_iterator iterator = listToPrint.begin();
-			iterator != listToPrint.end(); iterator++) {
+void CoarseBiLM::readLanguageModel(const char *lmFile) {
+	CoarseLM = ConstructCoarseLM(m_lmPath);
+
+}
+
+void CoarseBiLM::printList(const std::vector<std::string> &listToPrint) const {
+	for (std::vector<std::string>::const_iterator iterator =
+			listToPrint.begin(); iterator != listToPrint.end(); iterator++) {
 		std::cerr << *iterator << " ";
 	}
 	std::cerr << endl;
 }
 
+std::string CoarseBiLM::getStringFromList(
+		const std::vector<std::string> &listToConvert) const {
+	std::string result = "";
+	for (std::vector<std::string>::const_iterator iterator =
+			listToConvert.begin(); iterator != listToConvert.end();
+			iterator++) {
+		result = result + " " + *iterator;
+	}
+	boost::algorithm::trim(result);
+	return result;
+}
 }
 
