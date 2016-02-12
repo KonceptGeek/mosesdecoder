@@ -31,7 +31,11 @@ CoarseBiLM::CoarseBiLM(const std::string &line) :
 }
 
 CoarseBiLM::~CoarseBiLM() {
-	//delete CoarseLM;
+	delete CoarseLM;
+  delete srcWordToClusterId;
+  delete tgtWordToClusterId;
+  delete bitokenToBitokenId;
+  delete bitokenIdToClusterId;
 }
 
 void CoarseBiLM::Load() {
