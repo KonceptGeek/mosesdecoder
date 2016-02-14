@@ -31,6 +31,7 @@ CoarseBiLM::CoarseBiLM(const std::string &line) :
 }
 
 CoarseBiLM::~CoarseBiLM() {
+    VERBOSE(3, "Destructor Called" << endl);
     delete CoarseLM;
 }
 
@@ -38,7 +39,9 @@ void CoarseBiLM::Load() {
 	cvtSrcToClusterId = false;
 	cvtBitokenToBitokenId = false;
 	cvtBitokenIdToClusterId = false;
+    VERBOSE(3, "In load function, calling read parameters" << endl);
 	ReadParameters();
+    VERBOSE(3, "In load function, calling read language model" << endl);
 	readLanguageModel(m_lmPath.c_str());
 }
 
@@ -78,8 +81,8 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 		const FFState* prev_state,
 		ScoreComponentCollection* accumulator) const {
 	// dense scores
-
-	vector<string> targetWords;
+	VERBOSE(3, "In EvaluateWhenApplied" << endl);
+  vector<string> targetWords;
 	vector<string> sourceWords;
 	vector<string> targetWordIDs;
 	vector<string> sourceWordIDs;
@@ -92,28 +95,36 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
 	TargetPhrase currTargetPhrase = cur_hypo.GetCurrTargetPhrase();
 	Manager& manager = cur_hypo.GetManager();
+    VERBOSE(3, "Fetching source sentence" << endl);
 	const Sentence& sourceSentence =
 			static_cast<const Sentence&>(manager.GetSource());
 
 	//Get target words. Also, get the previous hypothesised target words.
+    VERBOSE(3, "Calling getTargetWords" << endl);
 	getTargetWords(cur_hypo, targetWords, alignments);
+    VERBOSE(3, "replacing target words with cluster ids" << endl);
 	replaceWordsWithClusterID(targetWords, tgtWordToClusterId, targetWordIDs);
 	vector<string> wordsToScore = targetWordIDs;
 
 	if (cvtSrcToClusterId) {
 		//Reads the source sentence and fills the sourceWords vector wit source words.
+      VERBOSE(3, "Fetching source words" << endl);
 		getSourceWords(sourceSentence, sourceWords);
+      VERBOSE(3, "Replacing source words with cluster ids" << endl);
 		replaceWordsWithClusterID(sourceWords, srcWordToClusterId,
 				sourceWordIDs);
 		if (cvtBitokenToBitokenId) {
 			//Create bitokens.
+        VERBOSE(3, "Creating bitokens" << endl);
 			createBitokens(sourceWordIDs, targetWordIDs, alignments, bitokens);
 			//Replace bitokens with bitoken tags
+        VERBOSE(3, "Replacing bitokens with bitoken tags" << endl);
 			replaceWordsWithClusterID(bitokens, bitokenToBitokenId,
 					bitokenBitokenIDs);
 			wordsToScore = bitokenBitokenIDs;
 			if (cvtBitokenIdToClusterId) {
 				//Replace bitoken tags with bitoken cluster ids
+          VERBOSE(3, "Replacing bitoken tags with cluster ids" << endl);
 				replaceWordsWithClusterID(bitokenBitokenIDs,
 						bitokenIdToClusterId, bitokenWordIDs);
 				wordsToScore = bitokenWordIDs;
@@ -124,6 +135,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 	State state(CoarseLM->BeginSentenceState()), outState;
 
 	//std::cerr << "Scoring Words" << std::endl;
+    VERBOSE(3, "Scoring words using language model: " << m_lmPath << endl);
 	for (std::vector<std::string>::const_iterator iterator =
 			wordsToScore.begin(); iterator != wordsToScore.end(); iterator++) {
 		std::string word = *iterator;
@@ -176,7 +188,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 	 std::cerr << "numScoreComponents: " << m_numScoreComponents << std::endl;
 	 std::cerr << "### Done For This Sentence ###" << std::endl;
 	 */
-
+    VERBOSE(3, "Done for this sentence" << endl);
 	vector<float> newScores(m_numScoreComponents);
 	newScores[0] = totalScore;
 	accumulator->PlusEquals(this, newScores);
@@ -406,6 +418,7 @@ void CoarseBiLM::SetParameter(const std::string& key,
 	} else {
 		StatefulFeatureFunction::SetParameter(key, value);
 	}
+    std::cerr << "Parameter Set: " << key << endl;
 }
 
 void CoarseBiLM::LoadManyToOneMap(const std::string& path,
