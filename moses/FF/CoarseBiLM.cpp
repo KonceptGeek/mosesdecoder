@@ -102,31 +102,46 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 	//Get target words. Also, get the previous hypothesised target words.
     VERBOSE(3, "Calling getTargetWords" << endl);
 	getTargetWords(cur_hypo, targetWords, alignments);
+    VERBOSE(3, "Found target words: " << getStringFromList(targetWords) << endl);
     VERBOSE(3, "replacing target words with cluster ids" << endl);
 	replaceWordsWithClusterID(targetWords, tgtWordToClusterId, targetWordIDs);
 	vector<string> wordsToScore = targetWordIDs;
+    
+    VERBOSE(3, "### Printing Alignments ###" << endl);
+	for(std::map<int, std::vector<int> >::const_iterator it = alignments.begin(); it != alignments.end(); it++) {
+	    VERBOSE(3, it->first << ":");
+	    for(vector<int>::const_iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
+	        VERBOSE(3, " " << *it2);
+	    }
+	    VERBOSE(3, endl);
+	}
+    VERBOSE(3, "DONE PRINTING ALIGNMENTS" << endl);
 
 	if (cvtSrcToClusterId) {
 		//Reads the source sentence and fills the sourceWords vector wit source words.
-      VERBOSE(3, "Fetching source words" << endl);
+        VERBOSE(3, "Fetching source words" << endl);
 		getSourceWords(sourceSentence, sourceWords);
-      VERBOSE(3, "Replacing source words with cluster ids" << endl);
+        VERBOSE(3, "Found source words: " << getStringFromList(sourceWords) << endl);
+        VERBOSE(3, "Replacing source words with cluster ids" << endl);
 		replaceWordsWithClusterID(sourceWords, srcWordToClusterId,
 				sourceWordIDs);
 		if (cvtBitokenToBitokenId) {
 			//Create bitokens.
-        VERBOSE(3, "Creating bitokens" << endl);
+          VERBOSE(3, "Creating bitokens" << endl);
 			createBitokens(sourceWordIDs, targetWordIDs, alignments, bitokens);
+          VERBOSE(3, "Found bitokens: " << getStringFromList(bitokens) << endl);
 			//Replace bitokens with bitoken tags
-        VERBOSE(3, "Replacing bitokens with bitoken tags" << endl);
+          VERBOSE(3, "Replacing bitokens with bitoken tags" << endl);
 			replaceWordsWithClusterID(bitokens, bitokenToBitokenId,
 					bitokenBitokenIDs);
+          VERBOSE(3, "Replaced bitokens with bitoken tags: " << getStringFromList(bitokenBitokenIDs) << endl);
 			wordsToScore = bitokenBitokenIDs;
 			if (cvtBitokenIdToClusterId) {
 				//Replace bitoken tags with bitoken cluster ids
           VERBOSE(3, "Replacing bitoken tags with cluster ids" << endl);
 				replaceWordsWithClusterID(bitokenBitokenIDs,
 						bitokenIdToClusterId, bitokenWordIDs);
+            VERBOSE(3, "Replaced bitoken tags with cluster ids: " << getStringFromList(bitokenWordIDs) << endl);
 				wordsToScore = bitokenWordIDs;
 			}
 		}
@@ -144,16 +159,8 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 		totalScore = totalScore + score;
 		state = outState;
 	}
-
-	/*std::cerr << "### Printing Alignments ###" << std::endl;
-	 for(std::map<int, std::vector<int> >::const_iterator it = alignments.begin(); it != alignments.end(); it++) {
-	 std::cerr << it->first << ":";
-	 for(vector<int>::const_iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
-	 std::cerr << " " << *it2;
-	 }
-	 std::cerr << std::endl;
-	 }
-
+  VERBOSE(3, "Scored using language model: " << totalScore << endl);
+  /*
 	 std::cerr << "### Printing Target Words ###" << std::endl;
 	 printList(targetWords);
 
