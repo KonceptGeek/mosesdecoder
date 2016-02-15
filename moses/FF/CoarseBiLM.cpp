@@ -121,10 +121,12 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 		//Reads the source sentence and fills the sourceWords vector wit source words.
         VERBOSE(3, "Fetching source words" << endl);
 		getSourceWords(sourceSentence, sourceWords);
+        VERBOSE(3, "Length of Source Words: " << sourceWords.size() << endl);
         VERBOSE(3, "Found source words: " << getStringFromList(sourceWords) << endl);
         VERBOSE(3, "Replacing source words with cluster ids" << endl);
 		replaceWordsWithClusterID(sourceWords, srcWordToClusterId,
 				sourceWordIDs);
+        VERBOSE(3, "Replaced Words With ClusterIDs: " << getStringFromList(sourceWordIDs) << endl);
 		if (cvtBitokenToBitokenId) {
 			//Create bitokens.
           VERBOSE(3, "Creating bitokens" << endl);
@@ -356,11 +358,18 @@ void CoarseBiLM::createBitokens(const std::vector<std::string> &sourceWords,
 			vector<int> sourceIndicess = pos->second;
 			for (vector<int>::const_iterator it = sourceIndicess.begin();
 					it != sourceIndicess.end(); it++) {
-				sourceWord = sourceWord + "_" + sourceWords[*it];
+          string tempWord = sourceWords[*it];
+          VERBOSE(3, "SourceWords Length: " << sourceWords.size() << endl);
+          VERBOSE(3, "SourceWords: " << getStringFromList(sourceWords) << endl);
+          VERBOSE(3, "Aligned TEMP WORD: " << tempWord << endl);
+				sourceWord = sourceWord + "_" + tempWord;
 			}
+        VERBOSE(3, "Aligned source words: " << sourceWord << endl);
 			sourceWord.erase(0, 1);
+        VERBOSE(3, "Aligned source words after trimming the underscore: " << sourceWord << endl);
 		}
 		string bitoken = sourceWord + "-" + targetWord;
+      VERBOSE(3, "Bitoken is: " << bitoken << endl);
 		//std::cerr << "Bitoken: " << bitoken << std::endl;
 		bitokens.push_back(bitoken);
 	}
@@ -465,7 +474,7 @@ std::string CoarseBiLM::getStringFromList(
 	for (std::vector<std::string>::const_iterator iterator =
 			listToConvert.begin(); iterator != listToConvert.end();
 			iterator++) {
-		result = result + " " + *iterator;
+		result = result + "||" + *iterator;
 	}
 	boost::algorithm::trim(result);
 	return result;
