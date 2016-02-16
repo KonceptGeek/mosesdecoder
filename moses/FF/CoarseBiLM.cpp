@@ -31,7 +31,7 @@ CoarseBiLM::CoarseBiLM(const std::string &line) :
 }
 
 CoarseBiLM::~CoarseBiLM() {
-    VERBOSE(3, "Destructor Called" << endl);
+    //VERBOSE(3, "Destructor Called" << endl);
     delete CoarseLM;
 }
 
@@ -39,9 +39,9 @@ void CoarseBiLM::Load() {
 	cvtSrcToClusterId = false;
 	cvtBitokenToBitokenId = false;
 	cvtBitokenIdToClusterId = false;
-    VERBOSE(3, "In load function, calling read parameters" << endl);
+    //VERBOSE(3, "In load function, calling read parameters" << endl);
 	ReadParameters();
-    VERBOSE(3, "In load function, calling read language model" << endl);
+    //VERBOSE(3, "In load function, calling read language model" << endl);
 	readLanguageModel(m_lmPath.c_str());
 }
 
@@ -81,7 +81,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 		const FFState* prev_state,
 		ScoreComponentCollection* accumulator) const {
 	// dense scores
-	VERBOSE(3, "In EvaluateWhenApplied" << endl);
+	//VERBOSE(3, "In EvaluateWhenApplied" << endl);
   vector<string> targetWords;
 	vector<string> sourceWords;
 	vector<string> targetWordIDs;
@@ -95,55 +95,55 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
 	TargetPhrase currTargetPhrase = cur_hypo.GetCurrTargetPhrase();
 	Manager& manager = cur_hypo.GetManager();
-    VERBOSE(3, "Fetching source sentence" << endl);
+    //VERBOSE(3, "Fetching source sentence" << endl);
 	const Sentence& sourceSentence =
 			static_cast<const Sentence&>(manager.GetSource());
 
 	//Get target words. Also, get the previous hypothesised target words.
-    VERBOSE(3, "Calling getTargetWords" << endl);
+    //VERBOSE(3, "Calling getTargetWords" << endl);
 	getTargetWords(cur_hypo, targetWords, alignments);
-    VERBOSE(3, "Found target words: " << getStringFromList(targetWords) << endl);
-    VERBOSE(3, "replacing target words with cluster ids" << endl);
+    //VERBOSE(3, "Found target words: " << getStringFromList(targetWords) << endl);
+    //VERBOSE(3, "replacing target words with cluster ids" << endl);
 	replaceWordsWithClusterID(targetWords, tgtWordToClusterId, targetWordIDs);
 	vector<string> wordsToScore = targetWordIDs;
     
-    VERBOSE(3, "### Printing Alignments ###" << endl);
+    /*//VERBOSE(3, "### Printing Alignments ###" << endl);
 	for(std::map<int, std::vector<int> >::const_iterator it = alignments.begin(); it != alignments.end(); it++) {
-	    VERBOSE(3, it->first << ":");
+	    //VERBOSE(3, it->first << ":");
 	    for(vector<int>::const_iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
-	        VERBOSE(3, " " << *it2);
+	        //VERBOSE(3, " " << *it2);
 	    }
-	    VERBOSE(3, endl);
+	    //VERBOSE(3, endl);
 	}
-    VERBOSE(3, "DONE PRINTING ALIGNMENTS" << endl);
+    //VERBOSE(3, "DONE PRINTING ALIGNMENTS" << endl);*/
 
 	if (cvtSrcToClusterId) {
 		//Reads the source sentence and fills the sourceWords vector wit source words.
-        VERBOSE(3, "Fetching source words" << endl);
+        //VERBOSE(3, "Fetching source words" << endl);
 		getSourceWords(sourceSentence, sourceWords);
-        VERBOSE(3, "Length of Source Words: " << sourceWords.size() << endl);
-        VERBOSE(3, "Found source words: " << getStringFromList(sourceWords) << endl);
-        VERBOSE(3, "Replacing source words with cluster ids" << endl);
+        //VERBOSE(3, "Length of Source Words: " << sourceWords.size() << endl);
+        //VERBOSE(3, "Found source words: " << getStringFromList(sourceWords) << endl);
+        //VERBOSE(3, "Replacing source words with cluster ids" << endl);
 		replaceWordsWithClusterID(sourceWords, srcWordToClusterId,
 				sourceWordIDs);
-        VERBOSE(3, "Replaced Words With ClusterIDs: " << getStringFromList(sourceWordIDs) << endl);
+        //VERBOSE(3, "Replaced Words With ClusterIDs: " << getStringFromList(sourceWordIDs) << endl);
 		if (cvtBitokenToBitokenId) {
 			//Create bitokens.
-          VERBOSE(3, "Creating bitokens" << endl);
+          //VERBOSE(3, "Creating bitokens" << endl);
 			createBitokens(sourceWordIDs, targetWordIDs, alignments, bitokens);
-          VERBOSE(3, "Found bitokens: " << getStringFromList(bitokens) << endl);
+          //VERBOSE(3, "Found bitokens: " << getStringFromList(bitokens) << endl);
 			//Replace bitokens with bitoken tags
-          VERBOSE(3, "Replacing bitokens with bitoken tags" << endl);
+          //VERBOSE(3, "Replacing bitokens with bitoken tags" << endl);
 			replaceWordsWithClusterID(bitokens, bitokenToBitokenId,
 					bitokenBitokenIDs);
-          VERBOSE(3, "Replaced bitokens with bitoken tags: " << getStringFromList(bitokenBitokenIDs) << endl);
+          //VERBOSE(3, "Replaced bitokens with bitoken tags: " << getStringFromList(bitokenBitokenIDs) << endl);
 			wordsToScore = bitokenBitokenIDs;
 			if (cvtBitokenIdToClusterId) {
 				//Replace bitoken tags with bitoken cluster ids
-          VERBOSE(3, "Replacing bitoken tags with cluster ids" << endl);
+          //VERBOSE(3, "Replacing bitoken tags with cluster ids" << endl);
 				replaceWordsWithClusterID(bitokenBitokenIDs,
 						bitokenIdToClusterId, bitokenWordIDs);
-            VERBOSE(3, "Replaced bitoken tags with cluster ids: " << getStringFromList(bitokenWordIDs) << endl);
+            //VERBOSE(3, "Replaced bitoken tags with cluster ids: " << getStringFromList(bitokenWordIDs) << endl);
 				wordsToScore = bitokenWordIDs;
 			}
 		}
@@ -152,7 +152,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 	State state(CoarseLM->BeginSentenceState()), outState;
 
 	//std::cerr << "Scoring Words" << std::endl;
-    VERBOSE(3, "Scoring words using language model: " << m_lmPath << endl);
+    //VERBOSE(3, "Scoring words using language model: " << m_lmPath << endl);
 	for (std::vector<std::string>::const_iterator iterator =
 			wordsToScore.begin(); iterator != wordsToScore.end(); iterator++) {
 		std::string word = *iterator;
@@ -161,7 +161,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 		totalScore = totalScore + score;
 		state = outState;
 	}
-  VERBOSE(3, "Scored using language model: " << totalScore << endl);
+  //VERBOSE(3, "Scored using language model: " << totalScore << endl);
   /*
 	 std::cerr << "### Printing Target Words ###" << std::endl;
 	 printList(targetWords);
@@ -197,7 +197,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 	 std::cerr << "numScoreComponents: " << m_numScoreComponents << std::endl;
 	 std::cerr << "### Done For This Sentence ###" << std::endl;
 	 */
-    VERBOSE(3, "Done for this sentence" << endl);
+    //VERBOSE(3, "Done for this sentence" << endl);
 	vector<float> newScores(m_numScoreComponents);
 	newScores[0] = totalScore;
 	accumulator->PlusEquals(this, newScores);
@@ -335,6 +335,15 @@ void CoarseBiLM::replaceWordsWithClusterID(
 				clusterIdMap.find(word);
 		if (pos == clusterIdMap.end()) {
 			//std::cerr << "did not find a value: " << word << std::endl;
+            std::map<std::string, std::string>::const_iterator unknownWord = clusterIdMap.find("_UNK_"); //for embeddings get the cluster of UNK record;
+            if (pos == clusterIdMap.end()) {
+                //VERBOSE(3, "Inserting NULL for word: " << word << endl);
+                wordClusterIDs.push_back("NULL");
+            } else {
+                //VERBOSE(3, "Inserting for _UNK_: " << word << endl);
+                std::string clusterId = unknownWord->second;
+                wordClusterIDs.push_back(clusterId);
+            }
 		} else {
 			std::string clusterId = pos->second;
 			wordClusterIDs.push_back(clusterId);
@@ -359,17 +368,17 @@ void CoarseBiLM::createBitokens(const std::vector<std::string> &sourceWords,
 			for (vector<int>::const_iterator it = sourceIndicess.begin();
 					it != sourceIndicess.end(); it++) {
           string tempWord = sourceWords[*it];
-          VERBOSE(3, "SourceWords Length: " << sourceWords.size() << endl);
-          VERBOSE(3, "SourceWords: " << getStringFromList(sourceWords) << endl);
-          VERBOSE(3, "Aligned TEMP WORD: " << tempWord << endl);
+          //VERBOSE(3, "SourceWords Length: " << sourceWords.size() << endl);
+          //VERBOSE(3, "SourceWords: " << getStringFromList(sourceWords) << endl);
+          //VERBOSE(3, "Aligned TEMP WORD: " << tempWord << endl);
 				sourceWord = sourceWord + "_" + tempWord;
 			}
-        VERBOSE(3, "Aligned source words: " << sourceWord << endl);
+        //VERBOSE(3, "Aligned source words: " << sourceWord << endl);
 			sourceWord.erase(0, 1);
-        VERBOSE(3, "Aligned source words after trimming the underscore: " << sourceWord << endl);
+        //VERBOSE(3, "Aligned source words after trimming the underscore: " << sourceWord << endl);
 		}
 		string bitoken = sourceWord + "-" + targetWord;
-      VERBOSE(3, "Bitoken is: " << bitoken << endl);
+        //VERBOSE(3, "Bitoken is: " << bitoken << endl);
 		//std::cerr << "Bitoken: " << bitoken << std::endl;
 		bitokens.push_back(bitoken);
 	}
