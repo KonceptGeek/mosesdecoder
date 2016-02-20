@@ -1,7 +1,6 @@
 #include <vector>
 #include <string>
 #include <fstream>
-#include <ctime>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include "CoarseBiLM.h"
@@ -11,6 +10,7 @@
 #include "moses/InputType.h"
 #include "moses/Word.h"
 #include "moses/AlignmentInfo.h"
+#include "moses/Timer.h"
 #include "lm/model.hh"
 
 using namespace std;
@@ -83,6 +83,9 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
         ScoreComponentCollection* accumulator) const {
     // dense scores
     VERBOSE(3, "In EvaluateWhenApplied" << endl);
+    Timer overallTimerObj;
+    overallTimerObj.start("CoarseBiLM Timer");
+
     vector<string> targetWords;
     vector<string> sourceWords;
     vector<string> targetWordIDs;
@@ -102,16 +105,18 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
     //Get target words. Also, get the previous hypothesised target words.
     //VERBOSE(3, "Calling getTargetWords" << endl);
-    clock_t beginTime = clock();
+    Timer timerObj;
+
+    timerObj.start("getTargetWords");
     getTargetWords(cur_hypo, targetWords, alignments);
-    VERBOSE(3,
-            "Time taken to getTargetWords: " << float( clock () - beginTime ) / (CLOCKS_PER_SEC/1000) << endl);
+    timerObj.stop("getTargetWords");
+    VERBOSE(3, "Time taken to getTargetWords: " << timerObj.get_elapsed_time() << endl);
     //VERBOSE(3, "Found target words: " << getStringFromList(targetWords) << endl);
     //VERBOSE(3, "replacing target words with cluster ids" << endl);
-    beginTime = clock();
+    timerObj.start("replace target words with cluster ids");
     replaceWordsWithClusterID(targetWords, tgtWordToClusterId, targetWordIDs);
-    VERBOSE(3,
-            "Time taken to replace target words with cluster ids: " << float( clock () - beginTime ) / (CLOCKS_PER_SEC/1000) << endl);
+    timerObj.stop("replace target words with cluster ids");
+    VERBOSE(3, "Time taken to replace target words with cluster ids: " << timerObj.get_elapsed_time()<< endl);
     vector<string> wordsToScore = targetWordIDs;
 
     /*//VERBOSE(3, "### Printing Alignments ###" << endl);
@@ -127,47 +132,52 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     if (cvtSrcToClusterId) {
         //Reads the source sentence and fills the sourceWords vector wit source words.
         //VERBOSE(3, "Fetching source words" << endl);
-        beginTime = clock();
+        timerObj.start("getSourceWords");
         getSourceWords(sourceSentence, sourceWords);
+        timerObj.stop("getSourceWords");
         VERBOSE(3,
-                "Time taken to getSourceWords: " << float( clock () - beginTime ) / (CLOCKS_PER_SEC/1000) << endl);
+                "Time taken to getSourceWords: " << timerObj.get_elapsed_time() << endl);
 
         //VERBOSE(3, "Length of Source Words: " << sourceWords.size() << endl);
         //VERBOSE(3, "Found source words: " << getStringFromList(sourceWords) << endl);
         //VERBOSE(3, "Replacing source words with cluster ids" << endl);
-        beginTime = clock();
+        timerObj.start("replace source words with cluster ids");
         replaceWordsWithClusterID(sourceWords, srcWordToClusterId,
                 sourceWordIDs);
+        timerObj.stop("replace source words with cluster ids");
         VERBOSE(3,
-                "Time taken to replace source words with cluster ids: " << float( clock () - beginTime ) / (CLOCKS_PER_SEC/1000) << endl);
+                "Time taken to replace source words with cluster ids: " << timerObj.get_elapsed_time()<< endl);
 
         //VERBOSE(3, "Replaced Words With ClusterIDs: " << getStringFromList(sourceWordIDs) << endl);
         if (cvtBitokenToBitokenId) {
             //Create bitokens.
             //VERBOSE(3, "Creating bitokens" << endl);
-            beginTime = clock();
+            timerObj.start("createBitokens");
             createBitokens(sourceWordIDs, targetWordIDs, alignments, bitokens);
+            timerObj.stop("createBitokens");
             VERBOSE(3,
-                    "Time taken to create bitokens: " << float( clock () - beginTime ) / (CLOCKS_PER_SEC/1000) << endl);
+                    "Time taken to create bitokens: " << timerObj.get_elapsed_time() << endl);
 
             //VERBOSE(3, "Found bitokens: " << getStringFromList(bitokens) << endl);
             //Replace bitokens with bitoken tags
             //VERBOSE(3, "Replacing bitokens with bitoken tags" << endl);
-            beginTime = clock();
+            timerObj.start("replace bitokens with bitoken tags");
             replaceWordsWithClusterID(bitokens, bitokenToBitokenId,
                     bitokenBitokenIDs);
+            timerObj.stop("replace bitokens with bitoken tags");
             VERBOSE(3,
-                    "Time taken to replace bitoken with bitoken tags: " << float( clock () - beginTime ) / (CLOCKS_PER_SEC/1000) << endl);
+                    "Time taken to replace bitoken with bitoken tags: " << timerObj.get_elapsed_time()<< endl);
             //VERBOSE(3, "Replaced bitokens with bitoken tags: " << getStringFromList(bitokenBitokenIDs) << endl);
             wordsToScore = bitokenBitokenIDs;
             if (cvtBitokenIdToClusterId) {
                 //Replace bitoken tags with bitoken cluster ids
                 //VERBOSE(3, "Replacing bitoken tags with cluster ids" << endl);
-                beginTime = clock();
+                timerObj.start("replace bitoken tags with cluster ids");
                 replaceWordsWithClusterID(bitokenBitokenIDs,
                         bitokenIdToClusterId, bitokenWordIDs);
+                timerObj.stop("replace bitoken tags with cluster ids");
                 VERBOSE(3,
-                        "Time taken to replace bitoken tags with cluster ids: " << float( clock () - beginTime ) / (CLOCKS_PER_SEC/1000) << endl);
+                        "Time taken to replace bitoken tags with cluster ids: " << timerObj.get_elapsed_time()<< endl);
                 //VERBOSE(3, "Replaced bitoken tags with cluster ids: " << getStringFromList(bitokenWordIDs) << endl);
                 wordsToScore = bitokenWordIDs;
             }
@@ -178,7 +188,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
     //std::cerr << "Scoring Words" << std::endl;
     //VERBOSE(3, "Scoring words using language model: " << m_lmPath << endl);
-    beginTime = clock();
+    timerObj.start();
     for (std::vector<std::string>::const_iterator iterator =
             wordsToScore.begin(); iterator != wordsToScore.end(); iterator++) {
         std::string word = *iterator;
@@ -187,8 +197,9 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
         totalScore = totalScore + score;
         state = outState;
     }
+    timerObj.stop();
     VERBOSE(3,
-            "Time taken to calculate scores: " << float( clock () - beginTime ) / (CLOCKS_PER_SEC/1000) << endl);
+            "Time taken to calculate scores: " << timerObj.get_elapsed_time() << endl);
     //VERBOSE(3, "Scored using language model: " << totalScore << endl);
     /*
      std::cerr << "### Printing Target Words ###" << std::endl;
@@ -230,7 +241,10 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     newScores[0] = totalScore;
     accumulator->PlusEquals(this, newScores);
 
-    size_t newState = getState(cur_hypo);
+    size_t newState = getState(wordsToScore);
+    overallTimerObj.stop("CoarseBiLM Timer");
+    VERBOSE(3, "CoarseBiLM Function Took " << overallTimerObj.get_elapsed_time() << endl);
+
     return new CoarseBiLMState(newState);
 }
 
@@ -413,32 +427,12 @@ void CoarseBiLM::createBitokens(const std::vector<std::string> &sourceWords,
     }
 }
 
-size_t CoarseBiLM::getState(const Hypothesis& cur_hypo) const {
+size_t CoarseBiLM::getState(const std::vector<std::string> &wordsToScore) const {
 
-    int currentTargetPhraseSize = cur_hypo.GetCurrTargetPhrase().GetSize();
-    int previousWordsNeeded = nGramOrder - currentTargetPhraseSize;
     size_t hashCode = 0;
 
-    if (previousWordsNeeded > 0) {
-        vector<string> previousWords(previousWordsNeeded);
-        std::map<int, vector<int> > alignments;
-        //Get previous target words
-        getPreviousTargetWords(cur_hypo, previousWordsNeeded, previousWords,
-                alignments);
-
-        for (int i = previousWords.size() - 1; i >= 0; i--) {
-            string previousWord = previousWords[i];
-            boost::algorithm::trim(previousWord);
-            if (!previousWord.empty()) {
-                boost::hash_combine(hashCode, previousWords[i]);
-            }
-        }
-    }
-
-    std::size_t targetBegin = cur_hypo.GetCurrTargetWordsRange().GetStartPos();
-    for (int index = 0; index < currentTargetPhraseSize; index++) {
-        boost::hash_combine(hashCode,
-                cur_hypo.GetWord(targetBegin + index).ToString());
+    for (int i = 0; i < wordsToScore.size(); i++ ) {
+        boost::hash_combine(hashCode, wordsToScore[i]);
     }
 
     return hashCode;

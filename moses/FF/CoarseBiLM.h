@@ -84,7 +84,7 @@ private:
 
 	void createBitokens(const std::vector<std::string> &sourceWords, const std::vector<std::string> &targetWords, const std::map<int, std::vector<int> > &alignments, std::vector<std::string> &bitokens) const;
 
-	size_t getState(const Hypothesis& cur_hypo) const;
+	size_t getState(const std::vector<std::string> &wordsToScore) const;
 
 	void printList(const std::vector<std::string> &listToPrint) const;
 
