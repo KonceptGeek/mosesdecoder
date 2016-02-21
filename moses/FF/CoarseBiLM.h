@@ -23,18 +23,23 @@ public:
 class CoarseBiLM: public StatefulFeatureFunction {
 
 protected:
-	std::map<std::string, std::string> tgtWordToClusterId;
-	std::map<std::string, std::string> srcWordToClusterId;
-	bool cvtSrcToClusterId;
+	std::map<std::string, std::string> tgtWordToClusterId100;
+	std::map<std::string, std::string> tgtWordToClusterId1600;
+	std::map<std::string, std::string> tgtWordToClusterId400;
+	std::map<std::string, std::string> srcWordToClusterId400;
 	std::map<std::string, std::string> bitokenToBitokenId;
-	bool cvtBitokenToBitokenId;
 	std::map<std::string, std::string> bitokenIdToClusterId;
-	bool cvtBitokenIdToClusterId;
 	int nGramOrder;
-	std::string m_lmPath;
+	std::string m_lmPath1600;
+	std::string m_lmPath100;
+	std::string m_bilmPathWithoutClustering;
+	std::string m_bilmPathWithClustering;
 
 public:
-	LM* CoarseLM;
+	LM* CoarseLM100;
+	LM* CoarseLM1600;
+	LM* CoarseBiLMWithoutClustering;
+	LM* CoarseBiLMWithClustering;
 
 	CoarseBiLM(const std::string &line);
 	~CoarseBiLM();
@@ -69,8 +74,6 @@ public:
 
 	void SetParameter(const std::string& key, const std::string& value);
 
-	void readLanguageModel(const char *);
-
 private:
 	void LoadManyToOneMap(const std::string& path, std::map<std::string, std::string> &manyToOneMap);
 
@@ -84,11 +87,13 @@ private:
 
 	void createBitokens(const std::vector<std::string> &sourceWords, const std::vector<std::string> &targetWords, const std::map<int, std::vector<int> > &alignments, std::vector<std::string> &bitokens) const;
 
-	size_t getState(const Hypothesis& cur_hypo) const;
+	size_t getState(const std::vector<std::string> &wordsToScore) const;
 
 	void printList(const std::vector<std::string> &listToPrint) const;
 
-  std::string getStringFromList(const std::vector<std::string> &listToConvert) const;
+	float getLMScore(const std::vector<std::string> &wordsToScore, const LM* languageModel) const;
+
+	std::string getStringFromList(const std::vector<std::string> &listToConvert) const;
 };
 
 }
