@@ -3,6 +3,7 @@
 #include <fstream>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/functional/hash.hpp>
 #include "CoarseBiLM.h"
 #include "moses/ScoreComponentCollection.h"
 #include "moses/Hypothesis.h"
@@ -28,6 +29,17 @@ int CoarseBiLMState::Compare(const FFState& other) const {
 ////////////////////////////////////////////////////////////////
 CoarseBiLM::CoarseBiLM(const std::string &line) :
         StatefulFeatureFunction(3, line) {
+            VERBOSE(3, "In constructor of CoarseBiLM" << endl);
+            if(!m_local.get()) {
+                VERBOSE(3, "Initializing ThreadLocalStorage" << endl);
+                m_local.reset(new ThreadLocalStorage);
+                if(m_local.get()) {
+                    VERBOSE(3, "Got get" << endl);
+                    CoarseBiLMCache& m_cache = m_local->cache;
+                    VERBOSE(3, "Got cache " << m_cache.size() << endl);
+                }
+                VERBOSE(3, "Finished initializing ThreadLocalStorage" << endl);
+            }
 }
 
 CoarseBiLM::~CoarseBiLM() {
@@ -36,16 +48,18 @@ CoarseBiLM::~CoarseBiLM() {
     delete CoarseLM1600;
     delete CoarseBiLMWithoutClustering;
     delete CoarseBiLMWithClustering;
+    VERBOSE(3, "Done Destructor Called" << endl);
 }
 
 void CoarseBiLM::Load() {
     VERBOSE(3, "In load function, calling read parameters" << endl);
     ReadParameters();
-    VERBOSE(3, "In load function, calling read language model" << endl);
+    VERBOSE(3, "In load function, loading language models" << endl);
     CoarseLM100 = ConstructCoarseLM(m_lmPath100.c_str());
     CoarseLM1600 = ConstructCoarseLM(m_lmPath1600.c_str());
     CoarseBiLMWithoutClustering = ConstructCoarseLM(m_bilmPathWithoutClustering.c_str());
     CoarseBiLMWithClustering = ConstructCoarseLM(m_bilmPathWithClustering.c_str());
+    VERBOSE(3, "In load function, finished loading language models" << endl);
 }
 
 void CoarseBiLM::EvaluateInIsolation(const Phrase &source,
@@ -87,8 +101,9 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     VERBOSE(3, "In EvaluateWhenApplied" << endl);
 
     Timer overallTimerObj;
-    overallTimerObj.start("CoarseBiLM Timer");
     Timer functionTimerObj;
+
+    overallTimerObj.start("CoarseBiLM Timer");
 
     vector<string> targetWords;
     vector<string> targetWordIDs100;
@@ -108,6 +123,8 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
     std::map<int, std::vector<int> > alignments;
 
+    vector<float> newScores(m_numScoreComponents);
+
     Manager& manager = cur_hypo.GetManager();
 
     functionTimerObj.start("fetchingSourceSentence");
@@ -121,98 +138,132 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     getTargetWords(cur_hypo, targetWords, alignments);
     functionTimerObj.stop("getTargetWords");
     VERBOSE(3, "Done getTargetWords: " << functionTimerObj.get_elapsed_time() << endl);
-
-
-    //replace tgtWords with 100 clusterIds
-    functionTimerObj.start("replace targetWords with 100 clusterIds");
-    replaceWordsWithClusterID(targetWords, tgtWordToClusterId100, targetWordIDs100);
-    functionTimerObj.stop("replace targetWords with 100 clusterIds");
-    VERBOSE(3, "Done replace targetWords with 100 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
-
-
-    //replace tgtWords with 1600 clusterIds
-    functionTimerObj.start("replace targetWords with 1600 clusterIds");
-    replaceWordsWithClusterID(targetWords, tgtWordToClusterId1600,
-            targetWordIDs1600);
-    functionTimerObj.stop("replace targetWords with 1600 clusterIds");
-    VERBOSE(3, "Done replace targetWords with 1600 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
-
-
-    //replace tgtWords with 400 clusterIds
-    functionTimerObj.start("replace targetWords with 400 clusterIds");
-    replaceWordsWithClusterID(targetWords, tgtWordToClusterId400,
-            targetWordIDs400);
-    functionTimerObj.stop("replace targetWords with 400 clusterIds");
-    VERBOSE(3, "Done replace targetWords with 400 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
-
+    VERBOSE(3, "TargetWords: " << getStringFromList(targetWords) << endl);
 
     //get source words
     functionTimerObj.start("getSourceWords");
     getSourceWords(sourceSentence, sourceWords);
     functionTimerObj.stop("getSourceWords");
     VERBOSE(3, "Done getSourceWords: " << functionTimerObj.get_elapsed_time() << endl);
+    VERBOSE(3, "SourceWords: " << getStringFromList(sourceWords) << endl);
+    
+    VERBOSE(3, "Getting cache key" << endl);
+    size_t cacheKey = getCacheKey(targetWords, alignments, sourceWords);
+    VERBOSE(3, "Got cache key: " << cacheKey << endl);
+
+    VERBOSE(3, "Getting cache object"<< endl);
+    if(m_local.get()) {
+        VERBOSE(3, "Cache Get works" << endl);
+    }
+    CoarseBiLMCache& m_cache = m_local->cache;
+    VERBOSE(3, "Got cache object: " << m_cache.size() << endl);
+    CoarseBiLMCache::const_iterator cacheFind = m_cache.find(cacheKey);
+    if (cacheFind == m_cache.end()) {
+    	//replace tgtWords with 100 clusterIds
+		functionTimerObj.start("replace targetWords with 100 clusterIds");
+		replaceWordsWithClusterID(targetWords, tgtWordToClusterId100,targetWordIDs100);
+		functionTimerObj.stop("replace targetWords with 100 clusterIds");
+		VERBOSE(3,"Done replace targetWords with 100 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
+		VERBOSE(3,"TargetWords100Id: " << getStringFromList(targetWordIDs100) << endl);
+
+		//replace tgtWords with 1600 clusterIds
+		functionTimerObj.start("replace targetWords with 1600 clusterIds");
+		replaceWordsWithClusterID(targetWords, tgtWordToClusterId1600, targetWordIDs1600);
+		functionTimerObj.stop("replace targetWords with 1600 clusterIds");
+		VERBOSE(3, "Done replace targetWords with 1600 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
+		VERBOSE(3, "TargetWords1600Id: " << getStringFromList(targetWordIDs1600) << endl);
+
+		//replace tgtWords with 400 clusterIds
+		functionTimerObj.start("replace targetWords with 400 clusterIds");
+		replaceWordsWithClusterID(targetWords, tgtWordToClusterId400, targetWordIDs400);
+		functionTimerObj.stop("replace targetWords with 400 clusterIds");
+		VERBOSE(3, "Done replace targetWords with 400 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
+		VERBOSE(3, "TargetWords400Id: " << getStringFromList(targetWordIDs400) << endl);
 
 
-    //replace source words with 400 cluster ids
-    functionTimerObj.start("replace sourceWords with 400 clusterIds");
-    replaceWordsWithClusterID(sourceWords, srcWordToClusterId400, sourceWordIDs400);
-    functionTimerObj.stop("replace sourceWords with 400 clusterIds");
-    VERBOSE(3, "Done replace sourceWords with 400 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
+		//replace source words with 400 cluster ids
+		functionTimerObj.start("replace sourceWords with 400 clusterIds");
+		replaceWordsWithClusterID(sourceWords, srcWordToClusterId400, sourceWordIDs400);
+		functionTimerObj.stop("replace sourceWords with 400 clusterIds");
+		VERBOSE(3, "Done replace sourceWords with 400 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
+		VERBOSE(3, "SourceWords400Id: " << getStringFromList(sourceWordIDs400) << endl);
 
+		//create bitokens
+		functionTimerObj.start("createBitokens");
+		createBitokens(sourceWordIDs400, targetWordIDs400, alignments, bitokens);
+		functionTimerObj.stop("createBitokens");
+		VERBOSE(3, "Done createBitokens: " << functionTimerObj.get_elapsed_time() << endl);
+		VERBOSE(3, "Bitokens: " << getStringFromList(bitokens) << endl);
 
-    //create bitokens
-    functionTimerObj.start("createBitokens");
-    createBitokens(sourceWordIDs400, targetWordIDs400, alignments, bitokens);
-    functionTimerObj.stop("createBitokens");
-    VERBOSE(3, "Done createBitokens: " << functionTimerObj.get_elapsed_time() << endl);
+		//replace bitokens with bitoken tags
+		functionTimerObj.start("replace bitokens with bitoken tags");
+		replaceWordsWithClusterID(bitokens, bitokenToBitokenId, bitokenBitokenIDs);
+		functionTimerObj.stop("replace bitokens with bitoken tags");
+		VERBOSE(3, "Done replace bitokens with bitoken tags: " << functionTimerObj.get_elapsed_time() << endl);
+		VERBOSE(3, "BitokensWithTags: " << getStringFromList(bitokenBitokenIDs) << endl);
 
+		//replace bitoken tags with bitoken cluster ids
+		functionTimerObj.start("replace bitoken tags with bitoken cluster ids");
+		replaceWordsWithClusterID(bitokenBitokenIDs, bitokenIdToClusterId, bitokenWordIDs);
+		functionTimerObj.stop("replace bitoken tags with bitoken cluster ids");
+		VERBOSE(3, "Done replace bitoken tags with bitoken cluster ids: " << functionTimerObj.get_elapsed_time() << endl);
+		VERBOSE(3, "BitokensTagsWithIds: " << getStringFromList(bitokenWordIDs) << endl);
 
-    //replace bitokens with bitoken tags
-    functionTimerObj.start("replace bitokens with bitoken tags");
-    replaceWordsWithClusterID(bitokens, bitokenToBitokenId, bitokenBitokenIDs);
-    functionTimerObj.stop("replace bitokens with bitoken tags");
-    VERBOSE(3, "Done replace bitokens with bitoken tags: " << functionTimerObj.get_elapsed_time() << endl);
+		//Score using CoarseLMs & CoarseBiLMs
+		functionTimerObj.start("scoreCoarseLM100");
+		scoreCoarseLM100 = getLMScore(targetWordIDs100, CoarseLM100);
+		functionTimerObj.stop("scoreCoarseLM100");
+		VERBOSE(3, "Done scoreCoarseLM100(" << scoreCoarseLM100 << "): " << functionTimerObj.get_elapsed_time() << endl);
 
-    //replace bitoken tags with bitoken cluster ids
-    functionTimerObj.start("replace bitoken tags with bitoken cluster ids");
-    replaceWordsWithClusterID(bitokenBitokenIDs, bitokenIdToClusterId, bitokenWordIDs);
-    functionTimerObj.stop("replace bitoken tags with bitoken cluster ids");
-    VERBOSE(3, "Done replace bitoken tags with bitoken cluster ids: " << functionTimerObj.get_elapsed_time() << endl);
+		functionTimerObj.start("scoreCoarseLM1600");
+		scoreCoarseLM1600 = getLMScore(targetWordIDs1600, CoarseLM1600);
+		functionTimerObj.stop("scoreCoarseLM1600");
+		VERBOSE(3, "Done scoreCoarseLM1600(" << scoreCoarseLM1600 << "): " << functionTimerObj.get_elapsed_time() << endl);
 
-    //Score using CoarseLMs & CoarseBiLMs
-    functionTimerObj.start("scoreCoarseLM100");
-    scoreCoarseLM100 = getLMScore(targetWordIDs100, CoarseLM100);
-    functionTimerObj.stop("scoreCoarseLM100");
-    VERBOSE(3, "Done scoreCoarseLM100: " << functionTimerObj.get_elapsed_time() << endl);
+		functionTimerObj.start("scoreCoarseBiLMWithoutBitokenCLustering");
+		scoreCoarseBiLMWithoutBitokenCLustering = getLMScore(bitokenBitokenIDs, CoarseBiLMWithoutClustering);
+		functionTimerObj.stop("scoreCoarseBiLMWithoutBitokenCLustering");
+		VERBOSE(3, "Done scoreCoarseBiLMWithoutBitokenCLustering(" << scoreCoarseBiLMWithoutBitokenCLustering << "): " << functionTimerObj.get_elapsed_time() << endl);
 
-    functionTimerObj.start("scoreCoarseLM1600");
-    scoreCoarseLM1600 = getLMScore(targetWordIDs1600, CoarseLM1600);
-    functionTimerObj.stop("scoreCoarseLM1600");
-    VERBOSE(3, "Done scoreCoarseLM1600: " << functionTimerObj.get_elapsed_time() << endl);
+		functionTimerObj.start("scoreCoarseBiLMWithBitokenCLustering");
+		scoreCoarseBiLMWithBitokenCLustering = getLMScore(bitokenWordIDs, CoarseBiLMWithClustering);
+		functionTimerObj.stop("scoreCoarseBiLMWithBitokenCLustering");
+		VERBOSE(3, "Done scoreCoarseBiLMWithBitokenCLustering(" << scoreCoarseBiLMWithBitokenCLustering << "): " << functionTimerObj.get_elapsed_time() << endl);
 
-    functionTimerObj.start("scoreCoarseBiLMWithoutBitokenCLustering");
-    scoreCoarseBiLMWithoutBitokenCLustering = getLMScore(bitokenBitokenIDs, CoarseBiLMWithoutClustering);
-    functionTimerObj.stop("scoreCoarseBiLMWithoutBitokenCLustering");
-    VERBOSE(3, "Done scoreCoarseBiLMWithoutBitokenCLustering: " << functionTimerObj.get_elapsed_time() << endl);
-
-    functionTimerObj.start("scoreCoarseBiLMWithBitokenCLustering");
-    scoreCoarseBiLMWithBitokenCLustering = getLMScore(bitokenWordIDs, CoarseBiLMWithClustering);
-    functionTimerObj.stop("scoreCoarseBiLMWithBitokenCLustering");
-    VERBOSE(3, "Done scoreCoarseBiLMWithBitokenCLustering: " << functionTimerObj.get_elapsed_time() << endl);
-
-    vector<float> newScores(m_numScoreComponents);
-    newScores[0] = scoreCoarseLM100;
-    newScores[1] = scoreCoarseLM1600;
-    newScores[2] = scoreCoarseBiLMWithoutBitokenCLustering;
-    newScores[3] = scoreCoarseBiLMWithBitokenCLustering;
+		newScores[0] = scoreCoarseLM100;
+		newScores[1] = scoreCoarseLM1600;
+		newScores[2] = scoreCoarseBiLMWithoutBitokenCLustering;
+		newScores[3] = scoreCoarseBiLMWithBitokenCLustering;
+		m_cache[cacheKey] = newScores;
+    } else {
+    	VERBOSE(3, "####################### FOUND IN CACHE ########################");
+    	newScores = cacheFind->second;
+    }
 
     accumulator->PlusEquals(this, newScores);
 
-    size_t newState = getState(bitokenWordIDs);
+    size_t newState = getState(targetWords);
     overallTimerObj.stop("CoarseBiLM Timer");
     VERBOSE(3, "CoarseBiLM Function Took " << overallTimerObj.get_elapsed_time() << endl);
 
     return new CoarseBiLMState(newState);
+}
+
+size_t CoarseBiLM::getCacheKey(const std::vector<std::string> &targetWords, const std::map<int, std::vector<int> > &alignments, const std::vector<std::string> &sourceWords) const {
+	string targetWordsStr = getStringFromList(targetWords);
+	string sourceWordsStr = getStringFromList(sourceWords);
+	string alignmentsStr = "";
+	for(std::map<int, std::vector<int> >::const_iterator it = alignments.begin(); it != alignments.end(); it++) {
+		alignmentsStr = alignmentsStr + boost::lexical_cast<std::string>(it->first) + ":";
+		for(vector<int>::const_iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
+			//VERBOSE(3, " " << *it2);
+			alignmentsStr = alignmentsStr + boost::lexical_cast<std::string>(*it2) + "_";
+		}
+	 alignmentsStr = alignmentsStr + "|";
+	}
+	boost::hash<std::string> string_hash;
+	std::size_t hashValue = string_hash(sourceWordsStr+"|||"+targetWordsStr+"|||"+alignmentsStr);
+	return hashValue;
 }
 
 float CoarseBiLM::getLMScore(const std::vector<std::string> &wordsToScore,
