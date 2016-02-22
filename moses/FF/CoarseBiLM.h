@@ -25,7 +25,7 @@ public:
 };
 
 class CoarseBiLM: public StatefulFeatureFunction {
-    typedef std::map< size_t, std::vector<float> > CoarseBiLMCache;
+    typedef std::map< const Sentence* , std::vector<std::string> > CoarseBiLMCache;
     struct ThreadLocalStorage {
         CoarseBiLMCache cache;
     };

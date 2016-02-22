@@ -142,103 +142,95 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
     //get source words
     functionTimerObj.start("getSourceWords");
-    getSourceWords(sourceSentence, sourceWords);
+    CoarseBiLMCache& m_cache = m_local->cache;
+    const CoarseBiLMCache::const_iterator query = m_cache.find( &sourceSentence );
+    if (query != m_cache.end() ) {
+        VERBOSE(3, "Found source words in cache" << endl);
+        sourceWords = query->second;
+    } else {
+        VERBOSE(3, "Did not find source words in cache" << endl);
+        getSourceWords(sourceSentence, sourceWords);
+        m_cache.insert( pair<const Sentence*, std::vector<std::string> >(&sourceSentence, sourceWords) );
+    }
     functionTimerObj.stop("getSourceWords");
     VERBOSE(3, "Done getSourceWords: " << functionTimerObj.get_elapsed_time() << endl);
     VERBOSE(3, "SourceWords: " << getStringFromList(sourceWords) << endl);
-    
-    VERBOSE(3, "Getting cache key" << endl);
-    size_t cacheKey = getCacheKey(targetWords, alignments, sourceWords);
-    VERBOSE(3, "Got cache key: " << cacheKey << endl);
 
-    VERBOSE(3, "Getting cache object"<< endl);
-    if(m_local.get()) {
-        VERBOSE(3, "Cache Get works" << endl);
-    }
-    CoarseBiLMCache& m_cache = m_local->cache;
-    VERBOSE(3, "Got cache object: " << m_cache.size() << endl);
-    CoarseBiLMCache::const_iterator cacheFind = m_cache.find(cacheKey);
-    if (cacheFind == m_cache.end()) {
-    	//replace tgtWords with 100 clusterIds
-		functionTimerObj.start("replace targetWords with 100 clusterIds");
-		replaceWordsWithClusterID(targetWords, tgtWordToClusterId100,targetWordIDs100);
-		functionTimerObj.stop("replace targetWords with 100 clusterIds");
-		VERBOSE(3,"Done replace targetWords with 100 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
-		VERBOSE(3,"TargetWords100Id: " << getStringFromList(targetWordIDs100) << endl);
+    //replace tgtWords with 100 clusterIds
+    functionTimerObj.start("replace targetWords with 100 clusterIds");
+    replaceWordsWithClusterID(targetWords, tgtWordToClusterId100,targetWordIDs100);
+    functionTimerObj.stop("replace targetWords with 100 clusterIds");
+    VERBOSE(3,"Done replace targetWords with 100 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
+    VERBOSE(3,"TargetWords100Id: " << getStringFromList(targetWordIDs100) << endl);
 
-		//replace tgtWords with 1600 clusterIds
-		functionTimerObj.start("replace targetWords with 1600 clusterIds");
-		replaceWordsWithClusterID(targetWords, tgtWordToClusterId1600, targetWordIDs1600);
-		functionTimerObj.stop("replace targetWords with 1600 clusterIds");
-		VERBOSE(3, "Done replace targetWords with 1600 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
-		VERBOSE(3, "TargetWords1600Id: " << getStringFromList(targetWordIDs1600) << endl);
+    //replace tgtWords with 1600 clusterIds
+    functionTimerObj.start("replace targetWords with 1600 clusterIds");
+    replaceWordsWithClusterID(targetWords, tgtWordToClusterId1600, targetWordIDs1600);
+    functionTimerObj.stop("replace targetWords with 1600 clusterIds");
+    VERBOSE(3, "Done replace targetWords with 1600 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
+    VERBOSE(3, "TargetWords1600Id: " << getStringFromList(targetWordIDs1600) << endl);
 
-		//replace tgtWords with 400 clusterIds
-		functionTimerObj.start("replace targetWords with 400 clusterIds");
-		replaceWordsWithClusterID(targetWords, tgtWordToClusterId400, targetWordIDs400);
-		functionTimerObj.stop("replace targetWords with 400 clusterIds");
-		VERBOSE(3, "Done replace targetWords with 400 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
-		VERBOSE(3, "TargetWords400Id: " << getStringFromList(targetWordIDs400) << endl);
+    //replace tgtWords with 400 clusterIds
+    functionTimerObj.start("replace targetWords with 400 clusterIds");
+    replaceWordsWithClusterID(targetWords, tgtWordToClusterId400, targetWordIDs400);
+    functionTimerObj.stop("replace targetWords with 400 clusterIds");
+    VERBOSE(3, "Done replace targetWords with 400 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
+    VERBOSE(3, "TargetWords400Id: " << getStringFromList(targetWordIDs400) << endl);
 
 
-		//replace source words with 400 cluster ids
-		functionTimerObj.start("replace sourceWords with 400 clusterIds");
-		replaceWordsWithClusterID(sourceWords, srcWordToClusterId400, sourceWordIDs400);
-		functionTimerObj.stop("replace sourceWords with 400 clusterIds");
-		VERBOSE(3, "Done replace sourceWords with 400 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
-		VERBOSE(3, "SourceWords400Id: " << getStringFromList(sourceWordIDs400) << endl);
+    //replace source words with 400 cluster ids
+    functionTimerObj.start("replace sourceWords with 400 clusterIds");
+    replaceWordsWithClusterID(sourceWords, srcWordToClusterId400, sourceWordIDs400);
+    functionTimerObj.stop("replace sourceWords with 400 clusterIds");
+    VERBOSE(3, "Done replace sourceWords with 400 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
+    VERBOSE(3, "SourceWords400Id: " << getStringFromList(sourceWordIDs400) << endl);
 
-		//create bitokens
-		functionTimerObj.start("createBitokens");
-		createBitokens(sourceWordIDs400, targetWordIDs400, alignments, bitokens);
-		functionTimerObj.stop("createBitokens");
-		VERBOSE(3, "Done createBitokens: " << functionTimerObj.get_elapsed_time() << endl);
-		VERBOSE(3, "Bitokens: " << getStringFromList(bitokens) << endl);
+    //create bitokens
+    functionTimerObj.start("createBitokens");
+    createBitokens(sourceWordIDs400, targetWordIDs400, alignments, bitokens);
+    functionTimerObj.stop("createBitokens");
+    VERBOSE(3, "Done createBitokens: " << functionTimerObj.get_elapsed_time() << endl);
+    VERBOSE(3, "Bitokens: " << getStringFromList(bitokens) << endl);
 
-		//replace bitokens with bitoken tags
-		functionTimerObj.start("replace bitokens with bitoken tags");
-		replaceWordsWithClusterID(bitokens, bitokenToBitokenId, bitokenBitokenIDs);
-		functionTimerObj.stop("replace bitokens with bitoken tags");
-		VERBOSE(3, "Done replace bitokens with bitoken tags: " << functionTimerObj.get_elapsed_time() << endl);
-		VERBOSE(3, "BitokensWithTags: " << getStringFromList(bitokenBitokenIDs) << endl);
+    //replace bitokens with bitoken tags
+    functionTimerObj.start("replace bitokens with bitoken tags");
+    replaceWordsWithClusterID(bitokens, bitokenToBitokenId, bitokenBitokenIDs);
+    functionTimerObj.stop("replace bitokens with bitoken tags");
+    VERBOSE(3, "Done replace bitokens with bitoken tags: " << functionTimerObj.get_elapsed_time() << endl);
+    VERBOSE(3, "BitokensWithTags: " << getStringFromList(bitokenBitokenIDs) << endl);
 
-		//replace bitoken tags with bitoken cluster ids
-		functionTimerObj.start("replace bitoken tags with bitoken cluster ids");
-		replaceWordsWithClusterID(bitokenBitokenIDs, bitokenIdToClusterId, bitokenWordIDs);
-		functionTimerObj.stop("replace bitoken tags with bitoken cluster ids");
-		VERBOSE(3, "Done replace bitoken tags with bitoken cluster ids: " << functionTimerObj.get_elapsed_time() << endl);
-		VERBOSE(3, "BitokensTagsWithIds: " << getStringFromList(bitokenWordIDs) << endl);
+    //replace bitoken tags with bitoken cluster ids
+    functionTimerObj.start("replace bitoken tags with bitoken cluster ids");
+    replaceWordsWithClusterID(bitokenBitokenIDs, bitokenIdToClusterId, bitokenWordIDs);
+    functionTimerObj.stop("replace bitoken tags with bitoken cluster ids");
+    VERBOSE(3, "Done replace bitoken tags with bitoken cluster ids: " << functionTimerObj.get_elapsed_time() << endl);
+    VERBOSE(3, "BitokensTagsWithIds: " << getStringFromList(bitokenWordIDs) << endl);
 
-		//Score using CoarseLMs & CoarseBiLMs
-		functionTimerObj.start("scoreCoarseLM100");
-		scoreCoarseLM100 = getLMScore(targetWordIDs100, CoarseLM100);
-		functionTimerObj.stop("scoreCoarseLM100");
-		VERBOSE(3, "Done scoreCoarseLM100(" << scoreCoarseLM100 << "): " << functionTimerObj.get_elapsed_time() << endl);
+    //Score using CoarseLMs & CoarseBiLMs
+    functionTimerObj.start("scoreCoarseLM100");
+    scoreCoarseLM100 = getLMScore(targetWordIDs100, CoarseLM100);
+    functionTimerObj.stop("scoreCoarseLM100");
+    VERBOSE(3, "Done scoreCoarseLM100(" << scoreCoarseLM100 << "): " << functionTimerObj.get_elapsed_time() << endl);
 
-		functionTimerObj.start("scoreCoarseLM1600");
-		scoreCoarseLM1600 = getLMScore(targetWordIDs1600, CoarseLM1600);
-		functionTimerObj.stop("scoreCoarseLM1600");
-		VERBOSE(3, "Done scoreCoarseLM1600(" << scoreCoarseLM1600 << "): " << functionTimerObj.get_elapsed_time() << endl);
+    functionTimerObj.start("scoreCoarseLM1600");
+    scoreCoarseLM1600 = getLMScore(targetWordIDs1600, CoarseLM1600);
+    functionTimerObj.stop("scoreCoarseLM1600");
+    VERBOSE(3, "Done scoreCoarseLM1600(" << scoreCoarseLM1600 << "): " << functionTimerObj.get_elapsed_time() << endl);
 
-		functionTimerObj.start("scoreCoarseBiLMWithoutBitokenCLustering");
-		scoreCoarseBiLMWithoutBitokenCLustering = getLMScore(bitokenBitokenIDs, CoarseBiLMWithoutClustering);
-		functionTimerObj.stop("scoreCoarseBiLMWithoutBitokenCLustering");
-		VERBOSE(3, "Done scoreCoarseBiLMWithoutBitokenCLustering(" << scoreCoarseBiLMWithoutBitokenCLustering << "): " << functionTimerObj.get_elapsed_time() << endl);
+    functionTimerObj.start("scoreCoarseBiLMWithoutBitokenCLustering");
+    scoreCoarseBiLMWithoutBitokenCLustering = getLMScore(bitokenBitokenIDs, CoarseBiLMWithoutClustering);
+    functionTimerObj.stop("scoreCoarseBiLMWithoutBitokenCLustering");
+    VERBOSE(3, "Done scoreCoarseBiLMWithoutBitokenCLustering(" << scoreCoarseBiLMWithoutBitokenCLustering << "): " << functionTimerObj.get_elapsed_time() << endl);
 
-		functionTimerObj.start("scoreCoarseBiLMWithBitokenCLustering");
-		scoreCoarseBiLMWithBitokenCLustering = getLMScore(bitokenWordIDs, CoarseBiLMWithClustering);
-		functionTimerObj.stop("scoreCoarseBiLMWithBitokenCLustering");
-		VERBOSE(3, "Done scoreCoarseBiLMWithBitokenCLustering(" << scoreCoarseBiLMWithBitokenCLustering << "): " << functionTimerObj.get_elapsed_time() << endl);
+    functionTimerObj.start("scoreCoarseBiLMWithBitokenCLustering");
+    scoreCoarseBiLMWithBitokenCLustering = getLMScore(bitokenWordIDs, CoarseBiLMWithClustering);
+    functionTimerObj.stop("scoreCoarseBiLMWithBitokenCLustering");
+    VERBOSE(3, "Done scoreCoarseBiLMWithBitokenCLustering(" << scoreCoarseBiLMWithBitokenCLustering << "): " << functionTimerObj.get_elapsed_time() << endl);
 
-		newScores[0] = scoreCoarseLM100;
-		newScores[1] = scoreCoarseLM1600;
-		newScores[2] = scoreCoarseBiLMWithoutBitokenCLustering;
-		newScores[3] = scoreCoarseBiLMWithBitokenCLustering;
-		m_cache[cacheKey] = newScores;
-    } else {
-    	VERBOSE(3, "####################### FOUND IN CACHE ########################");
-    	newScores = cacheFind->second;
-    }
+    newScores[0] = scoreCoarseLM100;
+    newScores[1] = scoreCoarseLM1600;
+    newScores[2] = scoreCoarseBiLMWithoutBitokenCLustering;
+    newScores[3] = scoreCoarseBiLMWithBitokenCLustering;
 
     accumulator->PlusEquals(this, newScores);
 
