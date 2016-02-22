@@ -81,7 +81,7 @@ private:
 
 	void getPreviousTargetWords(const Hypothesis& cur_hypo, int previousWordsNeeded, std::vector<std::string> &targetWords, std::map<int, std::vector<int> > &alignments) const;
 
-	void getSourceWords(const Sentence &sourceSentence, std::vector<std::string> &sourceWords) const;
+	void getSourceWords(const Sentence &sourceSentence, const std::map<int, std::vector<int> > &alignments, std::vector<std::string> &sourceWords) const;
 
 	void replaceWordsWithClusterID(const std::vector<std::string> &words, const std::map<std::string, std::string> &clusterIdMap, std::vector<std::string> &wordClusterIDs) const;
 

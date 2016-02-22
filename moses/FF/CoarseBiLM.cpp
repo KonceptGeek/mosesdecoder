@@ -95,8 +95,8 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     vector<string> targetWordIDs1600;
     vector<string> targetWordIDs400;
 
-    vector<string> sourceWords;
-    vector<string> sourceWordIDs400;
+    //vector<string> sourceWords;
+    //vector<string> sourceWordIDs400;
     vector<string> bitokens;
     vector<string> bitokenBitokenIDs;
     vector<string> bitokenWordIDs;
@@ -113,8 +113,11 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     functionTimerObj.start("fetchingSourceSentence");
     const Sentence& sourceSentence = static_cast<const Sentence&>(manager.GetSource());
     functionTimerObj.stop("fetchingSourceSentence");
-    VERBOSE(3, "Done fetching source sentence: " << functionTimerObj.get_elapsed_time() << endl);
+    VERBOSE(3, "Done fetching source sentence(" << sourceSentence.GetSize() << "): " << functionTimerObj.get_elapsed_time() << endl);
 
+    vector<string> sourceWords(sourceSentence.GetSize(), "NULL");
+    vector<string> sourceWordIDs400(sourceSentence.GetSize(), "NULL");
+    VERBOSE(3, "Initialized sourceWords:("<< sourceWords.size() <<") " << getStringFromList(sourceWords) << endl);
 
     //Get target words. Also, get the previous hypothesised target words.
     functionTimerObj.start("getTargetWords");
@@ -148,7 +151,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
     //get source words
     functionTimerObj.start("getSourceWords");
-    getSourceWords(sourceSentence, sourceWords);
+    getSourceWords(sourceSentence, alignments, sourceWords);
     functionTimerObj.stop("getSourceWords");
     VERBOSE(3, "Done getSourceWords: " << functionTimerObj.get_elapsed_time() << endl);
 
@@ -336,12 +339,12 @@ void CoarseBiLM::getPreviousTargetWords(const Hypothesis& cur_hypo,
 /*
  * Get the words in sourceSentence and fill the sourceWords vector.
  */
-void CoarseBiLM::getSourceWords(const Sentence &sourceSentence,
-        std::vector<std::string> &sourceWords) const {
-    for (int index = 0; index < sourceSentence.GetSize(); index++) {
-        string word = sourceSentence.GetWord(index).ToString();
-        boost::algorithm::trim(word);
-        sourceWords.push_back(word);
+void CoarseBiLM::getSourceWords(const Sentence &sourceSentence, const std::map<int, std::vector<int> > &alignments, std::vector<std::string> &sourceWords) const {
+    for(std::map<int, std::vector<int> >::const_iterator it = alignments.begin(); it != alignments.end(); it++) {
+        for(vector<int>::const_iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
+            int sourceIndex = *it2;
+            sourceWords[sourceIndex] = sourceSentence.GetWord(sourceIndex).ToString();
+        }
     }
 }
 
