@@ -77,15 +77,13 @@ public:
 private:
 	void LoadManyToOneMap(const std::string& path, std::map<std::string, std::string> &manyToOneMap);
 
-	void getTargetWords(const Hypothesis& cur_hypo, std::vector<std::string> &targetWords, std::map<int, std::vector<int> > &alignments) const;
+	void getTargetWords(const Hypothesis& cur_hypo, std::vector<std::string> &targetWords, std::vector<std::string> &targetWords100, std::vector<std::string> &targetWords1600, std::vector<std::string> &targetWords400, std::map<int, std::vector<int> > &alignments) const;
 
 	void getPreviousTargetWords(const Hypothesis& cur_hypo, int previousWordsNeeded, std::vector<std::string> &targetWords, std::map<int, std::vector<int> > &alignments) const;
 
 	void getSourceWords(const Sentence &sourceSentence, const std::map<int, std::vector<int> > &alignments, std::vector<std::string> &sourceWords) const;
 
-	void replaceWordsWithClusterID(const std::vector<std::string> &words, const std::map<std::string, std::string> &clusterIdMap, std::vector<std::string> &wordClusterIDs) const;
-
-	void createBitokens(const std::vector<std::string> &sourceWords, const std::vector<std::string> &targetWords, const std::map<int, std::vector<int> > &alignments, std::vector<std::string> &bitokens) const;
+	void createBitokens(const std::vector<std::string> &sourceWords, const std::vector<std::string> &targetWords, const std::map<int, std::vector<int> > &alignments, std::vector<std::string> &bitokenBitokenIDs, std::vector<std::string> &bitokenWordIDs) const;
 
 	size_t getState(const std::vector<std::string> &wordsToScore) const;
 
@@ -94,6 +92,8 @@ private:
 	float getLMScore(const std::vector<std::string> &wordsToScore, const LM* languageModel) const;
 
 	std::string getStringFromList(const std::vector<std::string> &listToConvert) const;
+
+	std::string getClusterID(const std::string &key, const std::map<std::string, std::string> &clusterIdMap) const;
 };
 
 }

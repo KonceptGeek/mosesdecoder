@@ -97,7 +97,6 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
     //vector<string> sourceWords;
     //vector<string> sourceWordIDs400;
-    vector<string> bitokens;
     vector<string> bitokenBitokenIDs;
     vector<string> bitokenWordIDs;
 
@@ -116,71 +115,33 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     VERBOSE(3, "Done fetching source sentence(" << sourceSentence.GetSize() << "): " << functionTimerObj.get_elapsed_time() << endl);
 
     vector<string> sourceWords(sourceSentence.GetSize(), "NULL");
-    vector<string> sourceWordIDs400(sourceSentence.GetSize(), "NULL");
+
     VERBOSE(3, "Initialized sourceWords:("<< sourceWords.size() <<") " << getStringFromList(sourceWords) << endl);
 
     //Get target words. Also, get the previous hypothesised target words.
     functionTimerObj.start("getTargetWords");
-    getTargetWords(cur_hypo, targetWords, alignments);
+    getTargetWords(cur_hypo, targetWords, targetWordIDs100, targetWordIDs1600, targetWordIDs400, alignments);
     functionTimerObj.stop("getTargetWords");
+    VERBOSE(3, "TargetWords: " << getStringFromList(targetWords) << endl);
+    VERBOSE(3, "TargetWords100: " << getStringFromList(targetWordIDs100) << endl);
+    VERBOSE(3, "TargetWords1600: " << getStringFromList(targetWordIDs1600) << endl);
+    VERBOSE(3, "TargetWords400: " << getStringFromList(targetWordIDs400) << endl);
     VERBOSE(3, "Done getTargetWords: " << functionTimerObj.get_elapsed_time() << endl);
-
-
-    //replace tgtWords with 100 clusterIds
-    functionTimerObj.start("replace targetWords with 100 clusterIds");
-    replaceWordsWithClusterID(targetWords, tgtWordToClusterId100, targetWordIDs100);
-    functionTimerObj.stop("replace targetWords with 100 clusterIds");
-    VERBOSE(3, "Done replace targetWords with 100 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
-
-
-    //replace tgtWords with 1600 clusterIds
-    functionTimerObj.start("replace targetWords with 1600 clusterIds");
-    replaceWordsWithClusterID(targetWords, tgtWordToClusterId1600,
-            targetWordIDs1600);
-    functionTimerObj.stop("replace targetWords with 1600 clusterIds");
-    VERBOSE(3, "Done replace targetWords with 1600 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
-
-
-    //replace tgtWords with 400 clusterIds
-    functionTimerObj.start("replace targetWords with 400 clusterIds");
-    replaceWordsWithClusterID(targetWords, tgtWordToClusterId400,
-            targetWordIDs400);
-    functionTimerObj.stop("replace targetWords with 400 clusterIds");
-    VERBOSE(3, "Done replace targetWords with 400 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
-
 
     //get source words
     functionTimerObj.start("getSourceWords");
     getSourceWords(sourceSentence, alignments, sourceWords);
     functionTimerObj.stop("getSourceWords");
+    VERBOSE(3, "SourceWords: " << getStringFromList(sourceWords) << endl);
     VERBOSE(3, "Done getSourceWords: " << functionTimerObj.get_elapsed_time() << endl);
-
-
-    //replace source words with 400 cluster ids
-    functionTimerObj.start("replace sourceWords with 400 clusterIds");
-    replaceWordsWithClusterID(sourceWords, srcWordToClusterId400, sourceWordIDs400);
-    functionTimerObj.stop("replace sourceWords with 400 clusterIds");
-    VERBOSE(3, "Done replace sourceWords with 400 clusterIds: " << functionTimerObj.get_elapsed_time() << endl);
-
 
     //create bitokens
     functionTimerObj.start("createBitokens");
-    createBitokens(sourceWordIDs400, targetWordIDs400, alignments, bitokens);
+    createBitokens(sourceWords, targetWordIDs400, alignments, bitokenBitokenIDs, bitokenWordIDs);
     functionTimerObj.stop("createBitokens");
+    VERBOSE(3, "BitokenBitokenIDs: " << getStringFromList(bitokenBitokenIDs) << endl);
+    VERBOSE(3, "BitokenWordIDs: " << getStringFromList(bitokenWordIDs) << endl);
     VERBOSE(3, "Done createBitokens: " << functionTimerObj.get_elapsed_time() << endl);
-
-
-    //replace bitokens with bitoken tags
-    functionTimerObj.start("replace bitokens with bitoken tags");
-    replaceWordsWithClusterID(bitokens, bitokenToBitokenId, bitokenBitokenIDs);
-    functionTimerObj.stop("replace bitokens with bitoken tags");
-    VERBOSE(3, "Done replace bitokens with bitoken tags: " << functionTimerObj.get_elapsed_time() << endl);
-
-    //replace bitoken tags with bitoken cluster ids
-    functionTimerObj.start("replace bitoken tags with bitoken cluster ids");
-    replaceWordsWithClusterID(bitokenBitokenIDs, bitokenIdToClusterId, bitokenWordIDs);
-    functionTimerObj.stop("replace bitoken tags with bitoken cluster ids");
-    VERBOSE(3, "Done replace bitoken tags with bitoken cluster ids: " << functionTimerObj.get_elapsed_time() << endl);
 
     //Score using CoarseLMs & CoarseBiLMs
     functionTimerObj.start("scoreCoarseLM100");
@@ -232,6 +193,22 @@ float CoarseBiLM::getLMScore(const std::vector<std::string> &wordsToScore,
     return totalScore;
 }
 
+std::string CoarseBiLM::getClusterID(
+        const std::string &word,
+        const std::map<std::string, std::string> &clusterIdMap) const {
+    std::string result = "NULL";
+    std::map<std::string, std::string>::const_iterator pos = clusterIdMap.find(word);
+    if (pos == clusterIdMap.end()) {
+        std::map<std::string, std::string>::const_iterator unknownWord = clusterIdMap.find("_UNK_"); //for embeddings get the cluster of UNK record;
+        if (pos != clusterIdMap.end()) {
+            result = unknownWord->second;
+        }
+    } else {
+        result = pos->second;
+    }
+    VERBOSE(3, "GetClusterId: " << word << "-" << result << endl);
+    return result;
+}
 /*
  * Get the target words from the current hypothesis and also the previous words from previous hypothesis.
  * While doing this, also get the alignments for the target words to the source words.
@@ -239,7 +216,10 @@ float CoarseBiLM::getLMScore(const std::vector<std::string> &wordsToScore,
  * targetWords and alignments are populated in this method.
  */
 void CoarseBiLM::getTargetWords(const Hypothesis& cur_hypo,
-        std::vector<std::string> &targetWords,
+		std::vector<std::string> &targetWords,
+        std::vector<std::string> &targetWords100,
+		std::vector<std::string> &targetWords1600,
+		std::vector<std::string> &targetWords400,
         std::map<int, vector<int> > &alignments) const {
 
     int currentTargetPhraseSize = cur_hypo.GetCurrTargetPhrase().GetSize();
@@ -248,14 +228,16 @@ void CoarseBiLM::getTargetWords(const Hypothesis& cur_hypo,
     if (previousWordsNeeded > 0) {
         vector<string> previousWords(previousWordsNeeded);
         //Get previous target words
-        getPreviousTargetWords(cur_hypo, previousWordsNeeded, previousWords,
-                alignments);
+        getPreviousTargetWords(cur_hypo, previousWordsNeeded, previousWords, alignments);
 
         for (int i = previousWords.size() - 1; i >= 0; i--) {
             string previousWord = previousWords[i];
             boost::algorithm::trim(previousWord);
             if (!previousWord.empty()) {
-                targetWords.push_back(previousWords[i]);
+            	targetWords.push_back(previousWord);
+            	targetWords100.push_back(getClusterID(previousWord, tgtWordToClusterId100));
+            	targetWords1600.push_back(getClusterID(previousWord, tgtWordToClusterId1600));
+            	targetWords400.push_back(getClusterID(previousWord, tgtWordToClusterId400));
             }
         }
     }
@@ -265,6 +247,10 @@ void CoarseBiLM::getTargetWords(const Hypothesis& cur_hypo,
         string word = cur_hypo.GetWord(targetBegin + index).ToString();
         boost::algorithm::trim(word);
         targetWords.push_back(word);
+        targetWords100.push_back(getClusterID(word, tgtWordToClusterId100));
+        targetWords1600.push_back(getClusterID(word, tgtWordToClusterId1600));
+        targetWords400.push_back(getClusterID(word, tgtWordToClusterId400));
+
         //find alignments for current word
         std::set<size_t> currWordAlignments =
                 cur_hypo.GetCurrTargetPhrase().GetAlignTerm().GetAlignmentsForTarget(
@@ -294,7 +280,7 @@ void CoarseBiLM::getTargetWords(const Hypothesis& cur_hypo,
  * targetWords and alignments are populated.
  */
 void CoarseBiLM::getPreviousTargetWords(const Hypothesis& cur_hypo,
-        int previousWordsNeeded, std::vector<std::string> &targetWords,
+        int previousWordsNeeded, std::vector<std::string> &previousWords,
         std::map<int, vector<int> > &alignments) const {
     const Hypothesis * prevHypo = cur_hypo.GetPrevHypo();
     int found = 0;
@@ -307,18 +293,14 @@ void CoarseBiLM::getPreviousTargetWords(const Hypothesis& cur_hypo,
         for (int i = currTargetPhrase.GetSize() - 1; i > -1; i--) {
             if (found != previousWordsNeeded) {
                 const Word& word = currTargetPhrase.GetWord(i);
-                targetWords[found] = word.ToString();
+                previousWords[found] = word.ToString();
 
                 //find alignments for current word
-                std::set<size_t> currWordAlignments =
-                        currTargetPhrase.GetAlignTerm().GetAlignmentsForTarget(
-                                i + tpBegin);
+                std::set<size_t> currWordAlignments = currTargetPhrase.GetAlignTerm().GetAlignmentsForTarget(i + tpBegin);
+
                 //add alignments to map
-                for (std::set<size_t>::const_iterator iterator =
-                        currWordAlignments.begin();
-                        iterator != currWordAlignments.end(); iterator++) {
-                    std::map<int, vector<int> >::iterator it = alignments.find(
-                            i + tpBegin);
+                for (std::set<size_t>::const_iterator iterator = currWordAlignments.begin(); iterator != currWordAlignments.end(); iterator++) {
+                    std::map<int, vector<int> >::iterator it = alignments.find(i + tpBegin);
                     vector<int> alignedSourceIndices;
                     if (it != alignments.end()) {
                         alignedSourceIndices = it->second;
@@ -326,7 +308,6 @@ void CoarseBiLM::getPreviousTargetWords(const Hypothesis& cur_hypo,
                     alignedSourceIndices.push_back((*iterator) + sourceBegin);
                     alignments[i + tpBegin] = alignedSourceIndices;
                 }
-
                 found++;
             } else {
                 return;
@@ -343,37 +324,7 @@ void CoarseBiLM::getSourceWords(const Sentence &sourceSentence, const std::map<i
     for(std::map<int, std::vector<int> >::const_iterator it = alignments.begin(); it != alignments.end(); it++) {
         for(vector<int>::const_iterator it2 = it->second.begin(); it2 != it->second.end(); it2++) {
             int sourceIndex = *it2;
-            sourceWords[sourceIndex] = sourceSentence.GetWord(sourceIndex).ToString();
-        }
-    }
-}
-
-void CoarseBiLM::replaceWordsWithClusterID(
-        const std::vector<std::string> &words,
-        const std::map<std::string, std::string> &clusterIdMap,
-        std::vector<std::string> &wordClusterIDs) const {
-//std::cerr << clusterIdMap.size() << std::endl;
-    for (std::vector<std::string>::const_iterator it = words.begin();
-            it != words.end(); it++) {
-        std::string word = *it;
-        boost::algorithm::trim(word);
-        std::map<std::string, std::string>::const_iterator pos =
-                clusterIdMap.find(word);
-        if (pos == clusterIdMap.end()) {
-            //std::cerr << "did not find a value: " << word << std::endl;
-            std::map<std::string, std::string>::const_iterator unknownWord =
-                    clusterIdMap.find("_UNK_"); //for embeddings get the cluster of UNK record;
-            if (pos == clusterIdMap.end()) {
-                //VERBOSE(3, "Inserting NULL for word: " << word << endl);
-                wordClusterIDs.push_back("NULL");
-            } else {
-                //VERBOSE(3, "Inserting for _UNK_: " << word << endl);
-                std::string clusterId = unknownWord->second;
-                wordClusterIDs.push_back(clusterId);
-            }
-        } else {
-            std::string clusterId = pos->second;
-            wordClusterIDs.push_back(clusterId);
+            sourceWords[sourceIndex] = getClusterID(sourceSentence.GetWord(sourceIndex).ToString(), srcWordToClusterId400);
         }
     }
 }
@@ -381,7 +332,7 @@ void CoarseBiLM::replaceWordsWithClusterID(
 void CoarseBiLM::createBitokens(const std::vector<std::string> &sourceWords,
         const std::vector<std::string> &targetWords,
         const std::map<int, std::vector<int> > &alignments,
-        std::vector<std::string> &bitokens) const {
+        std::vector<std::string> &bitokenBitokenIDs, std::vector<std::string> &bitokenWordIDs) const {
     for (int index = 0; index < targetWords.size(); index++) {
         string targetWord = targetWords[index];
         string sourceWord = "";
@@ -407,7 +358,10 @@ void CoarseBiLM::createBitokens(const std::vector<std::string> &sourceWords,
         string bitoken = sourceWord + "-" + targetWord;
         //VERBOSE(3, "Bitoken is: " << bitoken << endl);
         //std::cerr << "Bitoken: " << bitoken << std::endl;
-        bitokens.push_back(bitoken);
+        string bitokenBitokenId = getClusterID(bitoken, bitokenToBitokenId);
+        string bitokenClusterId = getClusterID(bitokenBitokenId, bitokenIdToClusterId);
+        bitokenBitokenIDs.push_back(bitokenBitokenId);
+        bitokenWordIDs.push_back(bitokenClusterId);
     }
 }
 
