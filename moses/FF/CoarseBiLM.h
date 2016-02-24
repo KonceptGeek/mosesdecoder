@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <string>
+#include <boost/unordered_map.hpp>
 #include "StatefulFeatureFunction.h"
 #include "FFState.h"
 #include "moses/Sentence.h"
@@ -23,12 +24,12 @@ public:
 class CoarseBiLM: public StatefulFeatureFunction {
 
 protected:
-	std::map<std::string, std::string> tgtWordToClusterId100;
-	std::map<std::string, std::string> tgtWordToClusterId1600;
-	std::map<std::string, std::string> tgtWordToClusterId400;
-	std::map<std::string, std::string> srcWordToClusterId400;
-	std::map<std::string, std::string> bitokenToBitokenId;
-	std::map<std::string, std::string> bitokenIdToClusterId;
+	boost::unordered_map<std::string, std::string> tgtWordToClusterId100;
+	boost::unordered_map<std::string, std::string> tgtWordToClusterId1600;
+	boost::unordered_map<std::string, std::string> tgtWordToClusterId400;
+	boost::unordered_map<std::string, std::string> srcWordToClusterId400;
+	boost::unordered_map<std::string, std::string> bitokenToBitokenId;
+	boost::unordered_map<std::string, std::string> bitokenIdToClusterId;
 	int nGramOrder;
 	std::string m_lmPath1600;
 	std::string m_lmPath100;
@@ -75,15 +76,15 @@ public:
 	void SetParameter(const std::string& key, const std::string& value);
 
 private:
-	void LoadManyToOneMap(const std::string& path, std::map<std::string, std::string> &manyToOneMap);
+	void LoadManyToOneMap(const std::string& path, boost::unordered_map<std::string, std::string> &manyToOneMap);
 
-	void getTargetWords(const Hypothesis& cur_hypo, std::vector<std::string> &targetWords, std::vector<std::string> &targetWords100, std::vector<std::string> &targetWords1600, std::vector<std::string> &targetWords400, std::map<int, std::vector<int> > &alignments) const;
+	void getTargetWords(const Hypothesis& cur_hypo, std::vector<std::string> &targetWords, std::vector<std::string> &targetWords100, std::vector<std::string> &targetWords1600, std::vector<std::string> &targetWords400, boost::unordered_map<int, std::vector<int> > &alignments) const;
 
-	void getPreviousTargetWords(const Hypothesis& cur_hypo, int previousWordsNeeded, std::vector<std::string> &targetWords, std::map<int, std::vector<int> > &alignments) const;
+	void getPreviousTargetWords(const Hypothesis& cur_hypo, int previousWordsNeeded, std::vector<std::string> &targetWords, boost::unordered_map<int, std::vector<int> > &alignments) const;
 
-	void getSourceWords(const Sentence &sourceSentence, const std::map<int, std::vector<int> > &alignments, std::vector<std::string> &sourceWords) const;
+	void getSourceWords(const Sentence &sourceSentence, const boost::unordered_map<int, std::vector<int> > &alignments, std::vector<std::string> &sourceWords) const;
 
-	void createBitokens(const std::vector<std::string> &sourceWords, const std::vector<std::string> &targetWords, const std::map<int, std::vector<int> > &alignments, std::vector<std::string> &bitokenBitokenIDs, std::vector<std::string> &bitokenWordIDs) const;
+	void createBitokens(const std::vector<std::string> &sourceWords, const std::vector<std::string> &targetWords, const boost::unordered_map<int, std::vector<int> > &alignments, std::vector<std::string> &bitokenBitokenIDs, std::vector<std::string> &bitokenWordIDs) const;
 
 	size_t getState(const std::vector<std::string> &wordsToScore) const;
 
@@ -93,7 +94,7 @@ private:
 
 	std::string getStringFromList(const std::vector<std::string> &listToConvert) const;
 
-	std::string getClusterID(const std::string &key, const std::map<std::string, std::string> &clusterIdMap) const;
+	std::string getClusterID(const std::string &key, const boost::unordered_map<std::string, std::string> &clusterIdMap) const;
 };
 
 }
