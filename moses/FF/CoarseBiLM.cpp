@@ -115,7 +115,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     VERBOSE(3, "Done fetching source sentence(" << sourceSentence.GetSize() << "): " << functionTimerObj.get_elapsed_time() << endl);
 
     vector<string> sourceWords(sourceSentence.GetSize(), "NULL");
-    vector<string> sourceWordIDs400(sourceSentence.GetSize(), "NULL");
+
     VERBOSE(3, "Initialized sourceWords:("<< sourceWords.size() <<") " << getStringFromList(sourceWords) << endl);
 
     //Get target words. Also, get the previous hypothesised target words.
@@ -137,7 +137,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
     //create bitokens
     functionTimerObj.start("createBitokens");
-    createBitokens(sourceWordIDs400, targetWordIDs400, alignments, bitokenBitokenIDs, bitokenWordIDs);
+    createBitokens(sourceWords, targetWordIDs400, alignments, bitokenBitokenIDs, bitokenWordIDs);
     functionTimerObj.stop("createBitokens");
     VERBOSE(3, "BitokenBitokenIDs: " << getStringFromList(bitokenBitokenIDs) << endl);
     VERBOSE(3, "BitokenWordIDs: " << getStringFromList(bitokenWordIDs) << endl);
@@ -234,10 +234,10 @@ void CoarseBiLM::getTargetWords(const Hypothesis& cur_hypo,
             string previousWord = previousWords[i];
             boost::algorithm::trim(previousWord);
             if (!previousWord.empty()) {
-            	targetWords.push_back(previousWords[i]);
-            	targetWords100.push_back(getClusterID(previousWords[i], tgtWordToClusterId100));
-            	targetWords1600.push_back(getClusterID(previousWords[i], tgtWordToClusterId1600));
-            	targetWords400.push_back(getClusterID(previousWords[i], tgtWordToClusterId400));
+            	targetWords.push_back(previousWord);
+            	targetWords100.push_back(getClusterID(previousWord, tgtWordToClusterId100));
+            	targetWords1600.push_back(getClusterID(previousWord, tgtWordToClusterId1600));
+            	targetWords400.push_back(getClusterID(previousWord, tgtWordToClusterId400));
             }
         }
     }
