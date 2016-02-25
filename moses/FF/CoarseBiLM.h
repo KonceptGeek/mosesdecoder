@@ -125,6 +125,8 @@ private:
 
 	std::string getStringFromList(const std::vector<std::string> &listToConvert) const;
 
+	std::string CoarseBiLM::getStringFromIntList(const lm::WordIndex &words[]) const;
+
 	std::string getClusterID(const std::string &key, const boost::unordered_map<std::string, std::string> &clusterIdMap) const;
 };
 
