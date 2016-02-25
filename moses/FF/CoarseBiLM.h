@@ -13,12 +13,45 @@ namespace Moses {
 
 class CoarseBiLMState: public FFState {
 	int m_targetLen;
+	std::vector<std::string> sourceWords;
+	lm::ngram::State lm100State;
+	lm::ngram::State lm1600State;
+	lm::ngram::State biLMWithoutClusteringState;
+	lm::ngram::State biLMWithClusteringState;
 public:
-	CoarseBiLMState(int targetLen) :
-			m_targetLen(targetLen) {
+	CoarseBiLMState(int targetLen) :m_targetLen(targetLen) {
+
+	}
+
+	CoarseBiLMState(int targetLen, std::vector<std::string> &source_Words,
+				lm::ngram::State &lm100_State, lm::ngram::State &lm1600_State, lm::ngram::State &biLMWithoutClustering_State,
+				lm::ngram::State &biLMWithClustering_State) : m_targetLen(targetLen), sourceWords(source_Words),
+				lm100State(lm100_State), lm1600State(lm1600_State),
+				biLMWithoutClusteringState(biLMWithoutClustering_State), biLMWithClusteringState (biLMWithClustering_State){
+
 	}
 
 	int Compare(const FFState& other) const;
+
+	const lm::ngram::State& getBiLmWithClusteringState() const {
+		return biLMWithClusteringState;
+	}
+
+	const lm::ngram::State& getBiLmWithoutClusteringState() const {
+		return biLMWithoutClusteringState;
+	}
+
+	const lm::ngram::State& getLm100State() const {
+		return lm100State;
+	}
+
+	const lm::ngram::State& getLm1600State() const {
+		return lm1600State;
+	}
+
+	const std::vector<std::string>& getSourceWords() const {
+		return sourceWords;
+	}
 };
 
 class CoarseBiLM: public StatefulFeatureFunction {
@@ -80,9 +113,7 @@ private:
 
 	void getTargetWords(const Hypothesis& cur_hypo, std::vector<std::string> &targetWords, std::vector<std::string> &targetWords100, std::vector<std::string> &targetWords1600, std::vector<std::string> &targetWords400, boost::unordered_map<int, std::vector<int> > &alignments) const;
 
-	void getPreviousTargetWords(const Hypothesis& cur_hypo, int previousWordsNeeded, std::vector<std::string> &targetWords, boost::unordered_map<int, std::vector<int> > &alignments) const;
-
-	void getSourceWords(const Sentence &sourceSentence, const boost::unordered_map<int, std::vector<int> > &alignments, std::vector<std::string> &sourceWords) const;
+	void getSourceWords(const Sentence &sourceSentence, std::vector<std::string> &sourceWords) const;
 
 	void createBitokens(const std::vector<std::string> &sourceWords, const std::vector<std::string> &targetWords, const boost::unordered_map<int, std::vector<int> > &alignments, std::vector<std::string> &bitokenBitokenIDs, std::vector<std::string> &bitokenWordIDs) const;
 
@@ -90,7 +121,7 @@ private:
 
 	void printList(const std::vector<std::string> &listToPrint) const;
 
-	float getLMScore(const std::vector<std::string> &wordsToScore, const LM* languageModel) const;
+	float getLMScore(const std::vector<std::string> &wordsToScore, const LM* languageModel, lm::ngram::State &state) const;
 
 	std::string getStringFromList(const std::vector<std::string> &listToConvert) const;
 
