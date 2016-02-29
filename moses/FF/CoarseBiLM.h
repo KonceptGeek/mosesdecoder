@@ -121,7 +121,7 @@ private:
 
 	void printList(const std::vector<std::string> &listToPrint) const;
 
-	float getLMScore(const std::vector<std::string> &wordsToScore, const LM* languageModel, lm::ngram::State &state) const;
+	float getLMScore(const std::string &wordToScore, const LM* languageModel, lm::ngram::State &state) const;
 
 	std::string getStringFromList(const std::vector<std::string> &listToConvert) const;
 
