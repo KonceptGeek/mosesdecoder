@@ -241,11 +241,11 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 		VERBOSE(3, "score100LM getting previous state" << endl);
 		lm100StartingState = prevCoarseBiLMState->getLm100State();
 		scoreCoarseLM100 = getLMScore(targetWords100, CoarseLM100, lm100StartingState);
-		VERBOSE(3, "score100LM words scored: " << ARRAY_SIZE(lm100StartingState.words) << endl);
+		VERBOSE(3, "score100LM words scored: " << getStringFromIntList(lm100StartingState.words) << endl);
 	} else {
-		State lm100StartingState(CoarseLM100->BeginSentenceState());
+		lm100StartingState = State(CoarseLM100->BeginSentenceState());
 		scoreCoarseLM100 = getLMScore(targetWords100, CoarseLM100, lm100StartingState);
-		VERBOSE(3, "score100LM words scored: " << ARRAY_SIZE(lm100StartingState.words) << endl);
+		VERBOSE(3, "score100LM words scored: " << getStringFromIntList(lm100StartingState.words) << endl);
 	}
 	functionTimerObj.stop("score100LM");
 	VERBOSE(3, "Score100LM(" << scoreCoarseLM100 << "): " << functionTimerObj.get_elapsed_time() << endl);
@@ -257,11 +257,11 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 		VERBOSE(3, "score1600LM getting previous state" << endl);
 		lm1600StartingState = prevCoarseBiLMState->getLm1600State();
 		scoreCoarseLM1600 = getLMScore(targetWords1600, CoarseLM1600, lm1600StartingState);
-		VERBOSE(3, "score1600LM words scored: " << ARRAY_SIZE(lm1600StartingState.words) << endl);
+		VERBOSE(3, "score1600LM words scored: " << getStringFromIntList(lm1600StartingState.words) << endl);
 	} else {
-		State lm1600StartingState(CoarseLM1600->BeginSentenceState());
+		lm1600StartingState = State(CoarseLM1600->BeginSentenceState());
 		scoreCoarseLM1600 = getLMScore(targetWords1600, CoarseLM1600, lm1600StartingState);
-		VERBOSE(3, "score1600LM words scored: " << ARRAY_SIZE(lm1600StartingState.words) << endl);
+		VERBOSE(3, "score1600LM words scored: " << getStringFromIntList(lm1600StartingState.words) << endl);
 	}
 	functionTimerObj.stop("score1600LM");
 	VERBOSE(3, "Score1600LM(" << scoreCoarseLM1600 << "): " << functionTimerObj.get_elapsed_time() << endl);
@@ -273,11 +273,11 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 		VERBOSE(3, "scoreBiLMWithoutClustering getting previous state" << endl);
 		lmBitokenWithoutClusteringState = prevCoarseBiLMState->getBiLmWithoutClusteringState();
 		scoreCoarseBiLMWithoutBitokenCLustering = getLMScore(bitokenBitokenIDs, CoarseBiLMWithoutClustering, lmBitokenWithoutClusteringState);
-		VERBOSE(3, "scoreBiLMWithoutClustering words scored: " << ARRAY_SIZE(lmBitokenWithoutClusteringState.words) << endl);
+		VERBOSE(3, "scoreBiLMWithoutClustering words scored: " << getStringFromIntList(lmBitokenWithoutClusteringState.words) << endl);
 	} else {
-		State lmBitokenWithoutClusteringState(CoarseBiLMWithoutClustering->BeginSentenceState());
+		lmBitokenWithoutClusteringState = State(CoarseBiLMWithoutClustering->BeginSentenceState());
 		scoreCoarseBiLMWithoutBitokenCLustering = getLMScore(bitokenBitokenIDs, CoarseBiLMWithoutClustering, lmBitokenWithoutClusteringState);
-		VERBOSE(3, "scoreBiLMWithoutClustering words scored: " << ARRAY_SIZE(lmBitokenWithoutClusteringState.words) << endl);
+		VERBOSE(3, "scoreBiLMWithoutClustering words scored: " << getStringFromIntList(lmBitokenWithoutClusteringState.words) << endl);
 	}
 	functionTimerObj.stop("scoreBiLMWithoutClustering");
 	VERBOSE(3, "ScoreBiLMWithoutClustering(" << scoreCoarseBiLMWithoutBitokenCLustering << "): " << functionTimerObj.get_elapsed_time() << endl);
@@ -289,11 +289,11 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 		VERBOSE(3, "scoreBiLMWithClustering getting previous state" << endl);
 		lmBitokenWithClusteringState = prevCoarseBiLMState->getBiLmWithClusteringState();
 		scoreCoarseBiLMWithBitokenCLustering = getLMScore(bitokenWordIDs, CoarseBiLMWithClustering, lmBitokenWithClusteringState);
-		VERBOSE(3, "scoreBiLMWithClustering words scored: " << ARRAY_SIZE(lmBitokenWithClusteringState.words) << endl);
+		VERBOSE(3, "scoreBiLMWithClustering words scored: " << getStringFromIntList(lmBitokenWithClusteringState.words) << endl);
 	} else {
-		State lmBitokenWithClusteringState(CoarseBiLMWithClustering->BeginSentenceState());
+		lmBitokenWithClusteringState = State(CoarseBiLMWithClustering->BeginSentenceState());
 		scoreCoarseBiLMWithBitokenCLustering = getLMScore(bitokenWordIDs, CoarseBiLMWithClustering, lmBitokenWithClusteringState);
-		VERBOSE(3, "scoreBiLMWithClustering words scored: " << ARRAY_SIZE(lmBitokenWithClusteringState.words) << endl);
+		VERBOSE(3, "scoreBiLMWithClustering words scored: " << getStringFromIntList(lmBitokenWithClusteringState.words) << endl);
 	}
 	functionTimerObj.stop("scoreBiLMWithClustering");
 	VERBOSE(3, "ScoreBiLMWithClustering(" << scoreCoarseBiLMWithBitokenCLustering << "): " << functionTimerObj.get_elapsed_time() << endl);
@@ -517,12 +517,13 @@ std::string CoarseBiLM::getStringFromList(
     return result;
 }
 
-std::string CoarseBiLM::getStringFromIntList(const lm::WordIndex &words[]) const {
-	std::string result = "";
-	for(int i = 0; i < ARRAY_SIZE(words); i++) {
-		result = result << "||" << words[i];
+std::string CoarseBiLM::getStringFromIntList(const lm::WordIndex words[7]) const {
+	ostringstream result;
+	for(int i = 0; i < 8; i++) {
+		result << words[i];
+		result << "||";
 	}
-	return result;
+	return result.str();
 }
 }
 
