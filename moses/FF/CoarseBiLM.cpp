@@ -89,14 +89,14 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     }
 
     Timer overallTimerObj;
-    //Timer functionTimerObj;
+    Timer functionTimerObj;
     overallTimerObj.start("CoarseBiLM Timer");
     vector<string> sourceWords;
-    //vector<string> targetWords;
-    //vector<string> targetWords100;
-    //vector<string> targetWords1600;
-    //vector<string> targetWords400;
-    //vector<string> bitokenBitokenIDs;
+    vector<string> targetWords;
+    vector<string> targetWords100;
+    vector<string> targetWords1600;
+    vector<string> targetWords400;
+    vector<string> bitokenBitokenIDs;
     vector<string> bitokenWordIDs;
 
     float scoreCoarseLM100 = 0.0;
@@ -111,12 +111,12 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
         //functionTimerObj.start("fetchingSourceSentence");
         const Sentence& sourceSentence = static_cast<const Sentence&>(cur_hypo.GetManager().GetSource());
         //functionTimerObj.stop("fetchingSourceSentence");
-        //VERBOSE(3, "Done fetching source sentence: " << functionTimerObj.get_elapsed_time() << endl);
+        VERBOSE(3, "Done fetching source sentence: " << functionTimerObj.get_elapsed_time() << endl);
 
         getSourceWords(sourceSentence, sourceWords);
     }
     //functionTimerObj.stop("getSourceWords");
-    //VERBOSE(3, "Done getting source words: " << getStringFromList(sourceWords) << ". It took: " << functionTimerObj.get_elapsed_time() << endl);
+    VERBOSE(3, "Done getting source words: " << getStringFromList(sourceWords) << ". It took: " << functionTimerObj.get_elapsed_time() << endl);
 
     State lm100StartingState;
     if(prev_state != NULL) {
@@ -129,7 +129,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     if(prev_state != NULL) {
         lm1600StartingState = prevCoarseBiLMState->getLm1600State();
     } else {
-        State lm1600StartingState(CoarseLM1600->BeginSentenceState());
+        lm1600StartingState = State(CoarseLM1600->BeginSentenceState());
     }
 
     State lmBitokenWithoutClusteringState;
@@ -150,7 +150,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     const TargetPhrase& currTargetPhrase = cur_hypo.GetCurrTargetPhrase();
     int currentTargetPhraseSize = currTargetPhrase.GetSize();
     size_t sourceBegin = cur_hypo.GetCurrSourceWordsRange().GetStartPos();
-    //functionTimerObj.start("scoring target words");
+    functionTimerObj.start("scoring target words");
     for (int index = 0; index < currentTargetPhraseSize; index++) {
         string word = currTargetPhrase.GetWord(index).ToString();
         boost::algorithm::trim(word);
@@ -158,16 +158,16 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
         string targetWord1600 = getClusterID(word, tgtWordToClusterId1600);
         string bitokenTargetWord = getClusterID(word, tgtWordToClusterId400);
 
-        //targetWords.push_back(word);
-        //targetWords100.push_back(targetWord100);
-        //targetWords1600.push_back(targetWord1600);
-        //targetWords400.push_back(bitokenTargetWord);
+        targetWords.push_back(word);
+        targetWords100.push_back(targetWord100);
+        targetWords1600.push_back(targetWord1600);
+        targetWords400.push_back(bitokenTargetWord);
 
         //find alignments for current word
         std::set<size_t> currWordAlignments = currTargetPhrase.GetAlignTerm().GetAlignmentsForTarget(index);
         string bitokenSourceWord = "";
         if(currWordAlignments.size() > 0) {
-        	//VERBOSE(3, "gotCurrWordAlignments" << endl);
+        	VERBOSE(3, "gotCurrWordAlignments" << endl);
             for (std::set<size_t>::const_iterator iterator = currWordAlignments.begin(); iterator != currWordAlignments.end(); iterator++) {
                 string tempWord = sourceWords[*iterator+sourceBegin];
                 //VERBOSE(3, "gotTempWord: " << tempWord << endl);
@@ -187,7 +187,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
         string bitokenClusterId = getClusterID(bitokenBitokenId, bitokenIdToClusterId);
         //VERBOSE(3, "bitokenClusterId: " << bitokenClusterId << endl);
 
-        //bitokenBitokenIDs.push_back(bitokenBitokenId);
+        bitokenBitokenIDs.push_back(bitokenBitokenId);
         bitokenWordIDs.push_back(bitokenClusterId);
 
         scoreCoarseLM100 += getLMScore(targetWord100, CoarseLM100, lm100StartingState);
@@ -196,18 +196,22 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
         scoreCoarseBiLMWithBitokenCLustering += getLMScore(bitokenClusterId, CoarseBiLMWithClustering, lmBitokenWithClusteringState);
     }
 
-    //functionTimerObj.stop("scoring target words");
-    //VERBOSE(3, "Done scoring target words. It took: " << functionTimerObj.get_elapsed_time() << endl);
+    functionTimerObj.stop("scoring target words");
+    VERBOSE(3, "Done scoring target words. It took: " << functionTimerObj.get_elapsed_time() << endl);
 
 
-    //VERBOSE(3, "Done creating bitokens: " << functionTimerObj.get_elapsed_time() << endl);
-    //VERBOSE(3, "TargetWords: " << getStringFromList(targetWords) << endl);
-    //VERBOSE(3, "TargetWords400: " << getStringFromList(targetWords400) << endl);
-    //VERBOSE(3, "TargetWords100: " << getStringFromList(targetWords100) << endl);
-    //VERBOSE(3, "TargetWords1600: " << getStringFromList(targetWords1600) << endl);
-    //VERBOSE(3, "BitokenBitokenIDs: " << getStringFromList(bitokenBitokenIDs) << endl);
-    //VERBOSE(3, "BitokenWordIDs: " << getStringFromList(bitokenWordIDs) << endl);
+    VERBOSE(3, "Done creating bitokens: " << functionTimerObj.get_elapsed_time() << endl);
+    VERBOSE(3, "TargetWords: " << getStringFromList(targetWords) << endl);
+    VERBOSE(3, "TargetWords400: " << getStringFromList(targetWords400) << endl);
+    VERBOSE(3, "TargetWords100: " << getStringFromList(targetWords100) << endl);
+    VERBOSE(3, "TargetWords1600: " << getStringFromList(targetWords1600) << endl);
+    VERBOSE(3, "BitokenBitokenIDs: " << getStringFromList(bitokenBitokenIDs) << endl);
+    VERBOSE(3, "BitokenWordIDs: " << getStringFromList(bitokenWordIDs) << endl);
 
+    VERBOSE(3, "scoreCoarseLM100: " << scoreCoarseLM100 << endl);
+    VERBOSE(3, "scoreCoarseLM1600: " << scoreCoarseLM1600 << endl);
+    VERBOSE(3, "scoreCoarseBiLMWithoutBitokenCLustering " << scoreCoarseBiLMWithoutBitokenCLustering << endl);
+    VERBOSE(3, "scoreCoarseBiLMWithBitokenCLustering: " << scoreCoarseBiLMWithBitokenCLustering << endl);
 
     vector<float> newScores(m_numScoreComponents);
     newScores[0] = scoreCoarseLM100;
