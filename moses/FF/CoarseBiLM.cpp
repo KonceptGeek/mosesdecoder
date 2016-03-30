@@ -21,9 +21,9 @@ int CoarseBiLMState::Compare(const FFState& other) const {
     const CoarseBiLMState &otherState =
             static_cast<const CoarseBiLMState&>(other);
 
-    if (m_targetLen == otherState.m_targetLen)
+    if (hashCode == otherState.hashCode)
         return 0;
-    return (m_targetLen < otherState.m_targetLen) ? -1 : +1;
+    return (hashCode < otherState.hashCode) ? -1 : +1;
 }
 ////////////////////////////////////////////////////////////////
 CoarseBiLM::CoarseBiLM(const std::string &line) :
@@ -65,6 +65,20 @@ void CoarseBiLM::EvaluateTranslationOptionListWithSourceContext(
         const TranslationOptionList &translationOptionList) const {
 }
 
+const FFState* CoarseBiLM::EmptyHypothesisState(const InputType &input) const
+{
+  VERBOSE(3,"CoarseBiLM::EmptyHypothesisState()" << endl);
+
+  State lm100StartingState = CoarseLM100->BeginSentenceState();
+  State lm1600StartingState = CoarseLM1600->BeginSentenceState();
+  State lmBitokenWithoutClusteringState = CoarseBiLMWithoutClustering->BeginSentenceState();
+  State lmBitokenWithClusteringState = CoarseBiLMWithClustering->BeginSentenceState();
+  vector<string> sourceWords;
+
+
+  return new CoarseBiLMState(0, sourceWords, lm100StartingState, lm1600StartingState, lmBitokenWithoutClusteringState, lmBitokenWithClusteringState);
+}
+
 //load the sri language models
 /*
  * I need to load the following many to one maps:
@@ -84,8 +98,17 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
         const FFState* prev_state,
         ScoreComponentCollection* accumulator) const {
     const CoarseBiLMState * prevCoarseBiLMState = NULL;
+    if(cur_hypo.GetWordsBitmap().GetNumWordsCovered() == 0) {
+    	prev_state = NULL;
+    	VERBOSE(3, "reseting state" << endl);
+    } else {
+    	VERBOSE(3, "wordsRange: " << cur_hypo.GetCurrSourceWordsRange() << endl);
+        VERBOSE(3, "cannot reset state: " << cur_hypo.GetWordsBitmap().GetNumWordsCovered() << endl);
+    }
     if(prev_state != NULL) {
         prevCoarseBiLMState =  static_cast<const CoarseBiLMState *>(prev_state);
+    } else {
+        VERBOSE(3, "state is null" << endl);
     }
 
     Timer overallTimerObj;
@@ -114,6 +137,9 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
         VERBOSE(3, "Done fetching source sentence: " << functionTimerObj.get_elapsed_time() << endl);
 
         getSourceWords(sourceSentence, sourceWords);
+        //VERBOSE(3, "resetting state cos of source words");
+        //prev_state = NULL;
+
     }
     //functionTimerObj.stop("getSourceWords");
     VERBOSE(3, "Done getting source words: " << getStringFromList(sourceWords) << ". It took: " << functionTimerObj.get_elapsed_time() << endl);
@@ -212,7 +238,27 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     VERBOSE(3, "scoreCoarseLM1600: " << scoreCoarseLM1600 << endl);
     VERBOSE(3, "scoreCoarseBiLMWithoutBitokenCLustering " << scoreCoarseBiLMWithoutBitokenCLustering << endl);
     VERBOSE(3, "scoreCoarseBiLMWithBitokenCLustering: " << scoreCoarseBiLMWithBitokenCLustering << endl);
-
+    
+    /*if(scoreCoarseLM100 < -400.0) {
+        scoreCoarseLM100 = -400.0;
+    } else if(scoreCoarseLM100 > 0.0) {
+        scoreCoarseLM100 = -1.0;
+    }
+    if(scoreCoarseLM1600 < -400.0) {
+        scoreCoarseLM1600 = -400.0;
+    } else if(scoreCoarseLM1600 > 0.0) {
+        scoreCoarseLM1600 = -1.0;
+    }
+    if(scoreCoarseBiLMWithoutBitokenCLustering < -400.0) {
+        scoreCoarseBiLMWithoutBitokenCLustering = -400.0;
+    } else if(scoreCoarseBiLMWithoutBitokenCLustering > 0.0) {
+        scoreCoarseBiLMWithoutBitokenCLustering = -1.0;
+    }
+    if(scoreCoarseBiLMWithBitokenCLustering < -400.0) {
+        scoreCoarseBiLMWithBitokenCLustering = -400.0;
+    } else if(scoreCoarseBiLMWithBitokenCLustering > 0.0) {
+        scoreCoarseBiLMWithBitokenCLustering = -1.0;
+    }*/
     vector<float> newScores(m_numScoreComponents);
     newScores[0] = scoreCoarseLM100;
     newScores[1] = scoreCoarseLM1600;
@@ -221,10 +267,10 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
     accumulator->PlusEquals(this, newScores);
 
-    size_t newState = getState(bitokenWordIDs);
     overallTimerObj.start("CoarseBiLM Timer");
     VERBOSE(3, "DONE CoarseBiLM: " << overallTimerObj.get_elapsed_time() << endl);
 
+    size_t newState = getState(bitokenWordIDs);
     return new CoarseBiLMState(newState, sourceWords, lm100StartingState, lm1600StartingState, lmBitokenWithoutClusteringState, lmBitokenWithClusteringState);
 }
 
@@ -281,7 +327,7 @@ size_t CoarseBiLM::getState(
 FFState* CoarseBiLM::EvaluateWhenApplied(const ChartHypothesis& /* cur_hypo */,
         int /* featureID - used to index the state in the previous hypotheses */,
         ScoreComponentCollection* accumulator) const {
-    return new CoarseBiLMState(0);
+	UTIL_THROW2("Chart decoding not support by UTIL_THROW2");
 }
 
 void CoarseBiLM::SetParameter(const std::string& key,

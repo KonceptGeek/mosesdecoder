@@ -148,8 +148,8 @@ safesystem($qsubcmd) or die;
 my $res;
 open (IN,"$jobscript.log") or die "Can't read main job id: $jobscript.log";
 chomp($res=<IN>);
-my @arrayStr = split(/\s+/,$res);
-my $id=$arrayStr[2];
+my @arrayStr = split(/\./,$res);
+my $id=$arrayStr[0];
 die "Failed to get job id from $jobscript.log, got: $res"
   if $id !~ /^[0-9]+$/;
 close(IN);
@@ -169,7 +169,7 @@ if ($old_sge) {
   safesystem("\\rm -f $checkpointfile") or die;
 
   # start the 'hold' job, i.e. the job that will wait
-  $cmd="qsub -cwd $queueparameters -hold_jid $id -o $checkpointfile -e /dev/null -N $qsubname.W $syncscript >& $qsubname.W.log";
+  $cmd="qsub $queueparameters -W depend=afterok:$id -j oe -o $checkpointfile -e /dev/null -N $qsubname.W $syncscript >& $qsubname.W.log";
   safesystem($cmd) or die;
   
   # and wait for checkpoint file to appear

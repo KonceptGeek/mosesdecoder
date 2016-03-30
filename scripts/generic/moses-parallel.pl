@@ -454,7 +454,7 @@ while ($robust && scalar @idx_todo) {
   } else {
     $batch_and_join = "-b no -j yes";
   }
-  $cmd="qsub $queueparameters $batch_and_join -o $qsubout$idx -e $qsuberr$idx -N $qsubname$idx ${jobscript}${idx}.bash > ${jobscript}${idx}.log 2>&1";
+  $cmd="qsub $queueparameters -o $qsubout$idx -e $qsuberr$idx -N $qsubname$idx ${jobscript}${idx}.bash > ${jobscript}${idx}.log 2>&1";
   print STDERR "$cmd\n" if $dbg; 
 
   safesystem($cmd) or die;
@@ -464,8 +464,8 @@ while ($robust && scalar @idx_todo) {
   open (IN,"${jobscript}${idx}.log")
     or die "Can't read id of job ${jobscript}${idx}.log";
   chomp($res=<IN>);
-  my @arrayStr = split(/\s+/,$res);
-  $id=$arrayStr[2];
+  my @arrayStr = split(/\./,$res);
+  $id=$arrayStr[0];
   die "Failed to guess job id from $jobscript$idx.log, got: $res"
     if $id !~ /^[0-9]+$/;
   close(IN);
@@ -474,7 +474,7 @@ while ($robust && scalar @idx_todo) {
  }
 
  #waiting until all jobs have finished
- my $hj = "-hold_jid " . join(" -hold_jid ", @sgepids);
+ my $hj = join(":", @sgepids);
 
  if ($old_sge) {
   # we need to implement our own waiting script
@@ -489,7 +489,7 @@ while ($robust && scalar @idx_todo) {
   safesystem("\\rm -f $checkpointfile") or kill_all_and_quit();
 
   # start the 'hold' job, i.e. the job that will wait
-  $cmd="qsub -cwd $queueparameters $hj -o $checkpointfile -e /dev/null -N $qsubname.W $syncscript 2> $qsubname.W.log";
+  $cmd="qsub $queueparameters -W depend=afterok:$hj -o $checkpointfile -e /dev/null -N $qsubname.W $syncscript 2> $qsubname.W.log";
   safesystem($cmd) or kill_all_and_quit();
   
   # and wait for checkpoint file to appear

@@ -12,23 +12,19 @@
 namespace Moses {
 
 class CoarseBiLMState: public FFState {
-	int m_targetLen;
+	int hashCode;
 	std::vector<std::string> sourceWords;
 	lm::ngram::State lm100State;
 	lm::ngram::State lm1600State;
 	lm::ngram::State biLMWithoutClusteringState;
 	lm::ngram::State biLMWithClusteringState;
 public:
-	CoarseBiLMState(int targetLen) :m_targetLen(targetLen) {
 
-	}
-
-	CoarseBiLMState(int targetLen, std::vector<std::string> &source_Words,
+	CoarseBiLMState(int hashCode, std::vector<std::string> &source_Words,
 				lm::ngram::State &lm100_State, lm::ngram::State &lm1600_State, lm::ngram::State &biLMWithoutClustering_State,
-				lm::ngram::State &biLMWithClustering_State) : m_targetLen(targetLen), sourceWords(source_Words),
+				lm::ngram::State &biLMWithClustering_State) : hashCode(hashCode), sourceWords(source_Words),
 				lm100State(lm100_State), lm1600State(lm1600_State),
 				biLMWithoutClusteringState(biLMWithoutClustering_State), biLMWithClusteringState (biLMWithClustering_State){
-
 	}
 
 	int Compare(const FFState& other) const;
@@ -83,9 +79,6 @@ public:
 	bool IsUseable(const FactorMask &mask) const {
 		return true;
 	}
-	virtual const FFState* EmptyHypothesisState(const InputType &input) const {
-		return new CoarseBiLMState(0);
-	}
 
 	void EvaluateInIsolation(const Phrase &source,
 			const TargetPhrase &targetPhrase,
@@ -107,6 +100,8 @@ public:
 			ScoreComponentCollection* accumulator) const;
 
 	void SetParameter(const std::string& key, const std::string& value);
+
+	virtual const FFState* EmptyHypothesisState(const InputType &input) const;
 
 private:
 	void LoadManyToOneMap(const std::string& path, boost::unordered_map<std::string, std::string> &manyToOneMap);
