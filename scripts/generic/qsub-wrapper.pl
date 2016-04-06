@@ -139,7 +139,7 @@ preparing_script();
 my $maysync = $old_sge ? "" : "-sync y";
 
 # create the qsubcmd to submit to the queue with the parameter "-b yes"
-my $qsubcmd="qsub $queueparameters $maysync -V -o $qsubout -e $qsuberr -N $qsubname -b yes $jobscript > $jobscript.log 2>&1";
+my $qsubcmd="ssh rcg-queen \"module load COMPILER/GNU/5.2.0; module load natlang; module load NL/LIB/GLIBC/2.14; bash -c 'qsub $queueparameters $maysync -V -o $qsubout -e $qsuberr -N $qsubname -b yes $jobscript > $jobscript.log 2>&1'\"";
 
 #run the qsubcmd 
 safesystem($qsubcmd) or die;
@@ -169,7 +169,7 @@ if ($old_sge) {
   safesystem("\\rm -f $checkpointfile") or die;
 
   # start the 'hold' job, i.e. the job that will wait
-  $cmd="qsub $queueparameters -W depend=afterok:$id -j oe -o $checkpointfile -e /dev/null -N $qsubname.W $syncscript >& $qsubname.W.log";
+  $cmd="ssh rcg-queen \"module load COMPILER/GNU/5.2.0; module load natlang; module load NL/LIB/GLIBC/2.14; bash -c 'qsub $queueparameters -W depend=afterok:$id -j oe -o $checkpointfile -e /dev/null -N $qsubname.W $syncscript >& $qsubname.W.log'\"";
   safesystem($cmd) or die;
   
   # and wait for checkpoint file to appear

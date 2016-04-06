@@ -454,7 +454,7 @@ while ($robust && scalar @idx_todo) {
   } else {
     $batch_and_join = "-b no -j yes";
   }
-  $cmd="qsub $queueparameters -o $qsubout$idx -e $qsuberr$idx -N $qsubname$idx ${jobscript}${idx}.bash > ${jobscript}${idx}.log 2>&1";
+  $cmd="ssh rcg-queen \"module load COMPILER/GNU/5.2.0; module load natlang; module load NL/LIB/GLIBC/2.14; bash -c 'qsub $queueparameters -o $qsubout$idx -e $qsuberr$idx -N $qsubname$idx ${jobscript}${idx}.bash > ${jobscript}${idx}.log 2>&1'\"";
   print STDERR "$cmd\n" if $dbg; 
 
   safesystem($cmd) or die;
@@ -489,7 +489,7 @@ while ($robust && scalar @idx_todo) {
   safesystem("\\rm -f $checkpointfile") or kill_all_and_quit();
 
   # start the 'hold' job, i.e. the job that will wait
-  $cmd="qsub $queueparameters -W depend=afterok:$hj -o $checkpointfile -e /dev/null -N $qsubname.W $syncscript 2> $qsubname.W.log";
+  $cmd="ssh rcg-queen \"module load COMPILER/GNU/5.2.0; module load natlang; module load NL/LIB/GLIBC/2.14; bash -c 'qsub $queueparameters -W depend=afterok:$hj -o $checkpointfile -e /dev/null -N $qsubname.W $syncscript 2> $qsubname.W.log'\"";
   safesystem($cmd) or kill_all_and_quit();
   
   # and wait for checkpoint file to appear
@@ -516,7 +516,7 @@ while ($robust && scalar @idx_todo) {
   }
  } else {
   # use the -sync option for qsub
-  $cmd="qsub $queueparameters -sync y $hj -j y -o /dev/null -e /dev/null -N $qsubname.W -b y /bin/ls > $qsubname.W.log";
+  $cmd="ssh rcg-queen \"module load COMPILER/GNU/5.2.0; module load natlang; module load NL/LIB/GLIBC/2.14; bash -c 'qsub $queueparameters -sync y $hj -j y -o /dev/null -e /dev/null -N $qsubname.W -b y /bin/ls > $qsubname.W.log'\"";
   safesystem($cmd) or kill_all_and_quit();
 
   $failure=&check_exit_status();
