@@ -16,25 +16,20 @@ class CoarseBiLMState: public FFState {
 	std::vector<std::string> sourceWords;
 	lm::ngram::State lm100State;
 	lm::ngram::State lm1600State;
-	lm::ngram::State biLMWithoutClusteringState;
 	lm::ngram::State biLMWithClusteringState;
 public:
 
 	CoarseBiLMState(int hashCode, std::vector<std::string> &source_Words,
-				lm::ngram::State &lm100_State, lm::ngram::State &lm1600_State, lm::ngram::State &biLMWithoutClustering_State,
+				lm::ngram::State &lm100_State, lm::ngram::State &lm1600_State,
 				lm::ngram::State &biLMWithClustering_State) : hashCode(hashCode), sourceWords(source_Words),
 				lm100State(lm100_State), lm1600State(lm1600_State),
-				biLMWithoutClusteringState(biLMWithoutClustering_State), biLMWithClusteringState (biLMWithClustering_State){
+				biLMWithClusteringState (biLMWithClustering_State){
 	}
 
 	int Compare(const FFState& other) const;
 
 	const lm::ngram::State& getBiLmWithClusteringState() const {
 		return biLMWithClusteringState;
-	}
-
-	const lm::ngram::State& getBiLmWithoutClusteringState() const {
-		return biLMWithoutClusteringState;
 	}
 
 	const lm::ngram::State& getLm100State() const {
@@ -55,8 +50,6 @@ class CoarseBiLM: public StatefulFeatureFunction {
 protected:
 	boost::unordered_map<std::string, std::string> tgtWordToClusterId100;
 	boost::unordered_map<std::string, std::string> tgtWordToClusterId1600;
-	boost::unordered_map<std::string, std::string> tgtWordToClusterId400;
-	boost::unordered_map<std::string, std::string> srcWordToClusterId400;
 	boost::unordered_map<std::string, std::string> bitokenToBitokenId;
 	boost::unordered_map<std::string, std::string> bitokenIdToClusterId;
 	int nGramOrder;

@@ -34,7 +34,6 @@ CoarseBiLM::~CoarseBiLM() {
     VERBOSE(3, "Destructor Called" << endl);
     delete CoarseLM100;
     delete CoarseLM1600;
-    delete CoarseBiLMWithoutClustering;
     delete CoarseBiLMWithClustering;
 }
 
@@ -44,7 +43,6 @@ void CoarseBiLM::Load() {
     VERBOSE(3, "In load function, calling read language model" << endl);
     CoarseLM100 = ConstructCoarseLM(m_lmPath100.c_str());
     CoarseLM1600 = ConstructCoarseLM(m_lmPath1600.c_str());
-    CoarseBiLMWithoutClustering = ConstructCoarseLM(m_bilmPathWithoutClustering.c_str());
     CoarseBiLMWithClustering = ConstructCoarseLM(m_bilmPathWithClustering.c_str());
 }
 
@@ -71,19 +69,16 @@ const FFState* CoarseBiLM::EmptyHypothesisState(const InputType &input) const
 
   State lm100StartingState = CoarseLM100->BeginSentenceState();
   State lm1600StartingState = CoarseLM1600->BeginSentenceState();
-  State lmBitokenWithoutClusteringState = CoarseBiLMWithoutClustering->BeginSentenceState();
   State lmBitokenWithClusteringState = CoarseBiLMWithClustering->BeginSentenceState();
   vector<string> sourceWords;
 
 
-  return new CoarseBiLMState(0, sourceWords, lm100StartingState, lm1600StartingState, lmBitokenWithoutClusteringState, lmBitokenWithClusteringState);
+  return new CoarseBiLMState(0, sourceWords, lm100StartingState, lm1600StartingState, lmBitokenWithClusteringState);
 }
 
 //load the sri language models
 /*
  * I need to load the following many to one maps:
- * 1. english (tgt) 400 cluster ids. Map<Word, ClusterId>
- * 2. chinese (src) 400 cluster ids. Map<Word, ClusterId>
  * 3. bitoken mapping Map<TgtId-SrcId, BitokenTag>
  * 4. bitoken clusters Map<BitokenTag, ClusterId>
  *
@@ -119,12 +114,10 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     vector<string> targetWords100;
     vector<string> targetWords1600;
     vector<string> targetWords400;
-    vector<string> bitokenBitokenIDs;
     vector<string> bitokenWordIDs;
 
     float scoreCoarseLM100 = 0.0;
     float scoreCoarseLM1600 = 0.0;
-    float scoreCoarseBiLMWithoutBitokenCLustering = 0.0;
     float scoreCoarseBiLMWithBitokenCLustering = 0.0;
 
     //functionTimerObj.start("getSourceWords");
@@ -158,13 +151,6 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
         lm1600StartingState = State(CoarseLM1600->BeginSentenceState());
     }
 
-    State lmBitokenWithoutClusteringState;
-    if(prev_state != NULL) {
-        lmBitokenWithoutClusteringState = prevCoarseBiLMState->getBiLmWithoutClusteringState();
-    } else {
-        lmBitokenWithoutClusteringState = State(CoarseBiLMWithoutClustering->BeginSentenceState());
-    }
-
     State lmBitokenWithClusteringState;
     if(prev_state != NULL) {
         lmBitokenWithClusteringState = prevCoarseBiLMState->getBiLmWithClusteringState();
@@ -182,7 +168,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
         boost::algorithm::trim(word);
         string targetWord100 = getClusterID(word, tgtWordToClusterId100);
         string targetWord1600 = getClusterID(word, tgtWordToClusterId1600);
-        string bitokenTargetWord = getClusterID(word, tgtWordToClusterId400);
+        string bitokenTargetWord = word;
 
         targetWords.push_back(word);
         targetWords100.push_back(targetWord100);
@@ -205,20 +191,18 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
         } else {
             bitokenSourceWord = "NULL";
         }
-        //VERBOSE(3, "bitokenSourceWord: " << bitokenSourceWord << endl);
+        VERBOSE(3, "bitokenSourceWord: " << bitokenSourceWord << endl);
         string bitoken = bitokenSourceWord + "-" + bitokenTargetWord;
-        //VERBOSE(3, "bitoken: " << bitoken << endl);
+        VERBOSE(3, "bitoken: " << bitoken << endl);
         string bitokenBitokenId = getClusterID(bitoken, bitokenToBitokenId);
-        //VERBOSE(3, "bitokenBitokenId: " << bitokenBitokenId << endl);
+        VERBOSE(3, "bitokenBitokenId: " << bitokenBitokenId << endl);
         string bitokenClusterId = getClusterID(bitokenBitokenId, bitokenIdToClusterId);
-        //VERBOSE(3, "bitokenClusterId: " << bitokenClusterId << endl);
+        VERBOSE(3, "bitokenClusterId: " << bitokenClusterId << endl);
 
-        bitokenBitokenIDs.push_back(bitokenBitokenId);
         bitokenWordIDs.push_back(bitokenClusterId);
 
         scoreCoarseLM100 += getLMScore(targetWord100, CoarseLM100, lm100StartingState);
         scoreCoarseLM1600 += getLMScore(targetWord1600, CoarseLM1600, lm1600StartingState);
-        scoreCoarseBiLMWithoutBitokenCLustering += getLMScore(bitokenBitokenId, CoarseBiLMWithoutClustering, lmBitokenWithoutClusteringState);
         scoreCoarseBiLMWithBitokenCLustering += getLMScore(bitokenClusterId, CoarseBiLMWithClustering, lmBitokenWithClusteringState);
     }
 
@@ -231,12 +215,10 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     VERBOSE(3, "TargetWords400: " << getStringFromList(targetWords400) << endl);
     VERBOSE(3, "TargetWords100: " << getStringFromList(targetWords100) << endl);
     VERBOSE(3, "TargetWords1600: " << getStringFromList(targetWords1600) << endl);
-    VERBOSE(3, "BitokenBitokenIDs: " << getStringFromList(bitokenBitokenIDs) << endl);
     VERBOSE(3, "BitokenWordIDs: " << getStringFromList(bitokenWordIDs) << endl);
 
     VERBOSE(3, "scoreCoarseLM100: " << scoreCoarseLM100 << endl);
     VERBOSE(3, "scoreCoarseLM1600: " << scoreCoarseLM1600 << endl);
-    VERBOSE(3, "scoreCoarseBiLMWithoutBitokenCLustering " << scoreCoarseBiLMWithoutBitokenCLustering << endl);
     VERBOSE(3, "scoreCoarseBiLMWithBitokenCLustering: " << scoreCoarseBiLMWithBitokenCLustering << endl);
     
     /*if(scoreCoarseLM100 < -400.0) {
@@ -259,11 +241,11 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     } else if(scoreCoarseBiLMWithBitokenCLustering > 0.0) {
         scoreCoarseBiLMWithBitokenCLustering = -1.0;
     }*/
+    VERBOSE(3, "ScoreComponents " << m_numScoreComponents << endl);
     vector<float> newScores(m_numScoreComponents);
     newScores[0] = scoreCoarseLM100;
     newScores[1] = scoreCoarseLM1600;
-    newScores[2] = scoreCoarseBiLMWithoutBitokenCLustering;
-    newScores[3] = scoreCoarseBiLMWithBitokenCLustering;
+    newScores[2] = scoreCoarseBiLMWithBitokenCLustering;
 
     accumulator->PlusEquals(this, newScores);
 
@@ -271,7 +253,7 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
     VERBOSE(3, "DONE CoarseBiLM: " << overallTimerObj.get_elapsed_time() << endl);
 
     size_t newState = getState(bitokenWordIDs);
-    return new CoarseBiLMState(newState, sourceWords, lm100StartingState, lm1600StartingState, lmBitokenWithoutClusteringState, lmBitokenWithClusteringState);
+    return new CoarseBiLMState(newState, sourceWords, lm100StartingState, lm1600StartingState, lmBitokenWithClusteringState);
 }
 
 float CoarseBiLM::getLMScore(const std::string &wordToScore, const LM* languageModel, lm::ngram::State &state) const {
@@ -307,7 +289,7 @@ void CoarseBiLM::getSourceWords(const Sentence &sourceSentence,
     for (int index = 0; index < sourceSentence.GetSize(); index++) {
         string word = sourceSentence.GetWord(index).ToString();
         boost::algorithm::trim(word);
-        sourceWords.push_back(getClusterID(word, srcWordToClusterId400));
+        sourceWords.push_back(word);
     }
 }
 
@@ -337,11 +319,7 @@ void CoarseBiLM::SetParameter(const std::string& key,
         LoadManyToOneMap(value, tgtWordToClusterId100);
     } else if(key == "tgtWordToClusterId1600") {
         LoadManyToOneMap(value, tgtWordToClusterId1600);
-    } else if(key == "tgtWordToClusterId400") {
-        LoadManyToOneMap(value, tgtWordToClusterId400);
-    } else if (key == "srcWordToClusterId") {
-        LoadManyToOneMap(value, srcWordToClusterId400);
-    } else if (key == "bitokenToBitokenId") {
+    }  else if (key == "bitokenToBitokenId") {
         LoadManyToOneMap(value, bitokenToBitokenId);
     } else if (key == "bitokenIdToClusterId") {
         LoadManyToOneMap(value, bitokenIdToClusterId);
