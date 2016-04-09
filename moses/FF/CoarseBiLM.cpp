@@ -215,11 +215,19 @@ FFState* CoarseBiLM::EvaluateWhenApplied(const Hypothesis& cur_hypo,
 
         bitokenBitokenIDs.push_back(bitokenBitokenId);
         bitokenWordIDs.push_back(bitokenClusterId);
-
-        scoreCoarseLM100 += getLMScore(targetWord100, CoarseLM100, lm100StartingState);
-        scoreCoarseLM1600 += getLMScore(targetWord1600, CoarseLM1600, lm1600StartingState);
-        scoreCoarseBiLMWithoutBitokenCLustering += getLMScore(bitokenBitokenId, CoarseBiLMWithoutClustering, lmBitokenWithoutClusteringState);
-        scoreCoarseBiLMWithBitokenCLustering += getLMScore(bitokenClusterId, CoarseBiLMWithClustering, lmBitokenWithClusteringState);
+        
+        if(targetWord100 != "NULL") {
+            scoreCoarseLM100 += getLMScore(targetWord100, CoarseLM100, lm100StartingState);
+        }
+        if(targetWord1600 != "NULL") {
+            scoreCoarseLM1600 += getLMScore(targetWord1600, CoarseLM1600, lm1600StartingState);
+        }
+        if(bitokenBitokenId != "NULL") {
+            scoreCoarseBiLMWithoutBitokenCLustering += getLMScore(bitokenBitokenId, CoarseBiLMWithoutClustering, lmBitokenWithoutClusteringState);
+        }
+        if(bitokenClusterId != "NULL") {
+            scoreCoarseBiLMWithBitokenCLustering += getLMScore(bitokenClusterId, CoarseBiLMWithClustering, lmBitokenWithClusteringState);
+        }
     }
 
     functionTimerObj.stop("scoring target words");
